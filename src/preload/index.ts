@@ -56,6 +56,8 @@ const api = {
   pipOpacity: (value: number): Promise<void> => ipcRenderer.invoke('pdfx:pip-opacity', value),
   sidecar: (input: Uint8Array, request: SidecarRequest): Promise<Uint8Array> =>
     ipcRenderer.invoke('pdfx:sidecar', input, request),
+  /** Kullanılan özelliği bildirir (telemetri). Ateşle-unut: arayüz sonucu beklemez. */
+  olay: (ad: string): void => void ipcRenderer.invoke('pdfx:olay', ad),
   onPipChanged: (callback: (pip: boolean) => void): (() => void) => {
     const listener = (_event: Electron.IpcRendererEvent, pip: boolean): void => callback(pip)
     ipcRenderer.on('pdfx:pip-changed', listener)

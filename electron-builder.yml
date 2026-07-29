@@ -9,7 +9,9 @@ files:
   - '!arac/**'
   - '!_pdfx-kaynak/**'
   - '!electron.vite.config.{js,ts,mjs,cjs}'
-  - '!{.prettierignore,.prettierrc.yaml,.editorconfig,dev-app-update.yml,README.md,SPEC.md,PLAN.md}'
+  - '!{.prettierignore,.prettierrc.yaml,.editorconfig,dev-app-update.yml,README.md,README.tr.md,SPEC.md,PLAN.md}'
+  - '!sunucu/**'          # telemetri toplayıcısı sunucuda çalışır, istemciye girmez
+  - '!.github/**'
   - '!{.env,.env.*,.npmrc,pnpm-lock.yaml,yarn.lock}'
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
   - '!scripts/**'
@@ -46,6 +48,18 @@ fileAssociations:
     name: Word Belgesi
     description: Word Belgesi
     role: Viewer
+  - ext: csv
+    name: CSV Tablosu
+    description: Virgülle Ayrılmış Tablo
+    role: Viewer
+  - ext: tsv
+    name: TSV Tablosu
+    description: Sekmeyle Ayrılmış Tablo
+    role: Viewer
+  - ext: json
+    name: JSON Belgesi
+    description: JSON Belgesi
+    role: Viewer
 win:
   executableName: pidir
   # NSIS kurulum, portable'ın YERİNE geçti. Portable hedefi her çalıştırmada 98 MB'lık
@@ -60,9 +74,23 @@ nsis:
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
-  oneClick: false                        # kurulum sihirbazı görünsün
-  perMachine: true                       # Program Files altına kur (tüm kullanıcılar)
-  allowToChangeInstallationDirectory: true
-  include: build/kurulum.nsh             # varsayılan dizini "LLM Programları" yapar
+  # Tek tık kurulum (Chrome/VS Code deseni). "assisted" kip (oneClick:false +
+  # allowToChangeInstallationDirectory) sessiz kurulumda (/S) erişim ihlaliyle
+  # çöküyordu; ayrıca otomatik güncelleme zaten sessiz kurulum yolunu kullanıyor,
+  # yani her güncellemede sihirbaz göstermek istemediğimiz için de doğrusu bu.
+  oneClick: true
+  # perMachine KASITEN false: Program Files'a kurulsaydı HER otomatik güncelleme
+  # yönetici onayı (UAC penceresi) isterdi ve "hiç rahatsız etmeyen güncelleme"
+  # sözü tutulamazdı. Chrome/VS Code de aynı sebeple kullanıcı klasörüne kurulur.
+  perMachine: false
   runAfterFinish: false
+  deleteAppDataOnUninstall: false
+
+# Otomatik güncelleme kanalı. bisiler.com'un TAMAMI BasicAuth arkasında olduğu için
+# anonim bir kullanıcı oradan güncelleme indiremezdi; GitHub Releases hem açık hem CDN'li.
+# Telemetri yine bisiler'e gidiyor (src/main/telemetri.ts) — yalnız binary dağıtımı burada.
+publish:
+  provider: github
+  owner: omersalt
+  repo: pidir
 npmRebuild: false

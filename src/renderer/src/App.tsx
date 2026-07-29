@@ -59,7 +59,19 @@ export default function App(): React.JSX.Element {
   const [ocrEnabled, setOcrEnabled] = useState(false)
   const searchIndex = useSearchIndex(docs, ocrEnabled)
   const find = useFind(searchIndex.search, searchIndex.version)
-  useEffect(() => setOcrEnabled(find.open), [find.open])
+  useEffect(() => {
+    setOcrEnabled(find.open)
+    if (find.open) window.api.olay('arama')
+  }, [find.open])
+
+  // Taranmış belge saptanıp OCR kuyruğa girdiğinde bir kez bildir.
+  const ocrBildirildi = useRef(false)
+  useEffect(() => {
+    if (searchIndex.hasScanned && !ocrBildirildi.current) {
+      ocrBildirildi.current = true
+      window.api.olay('ocr')
+    }
+  }, [searchIndex.hasScanned])
   const findState = useMemo(
     () => ({
       active: find.active,
@@ -88,6 +100,7 @@ export default function App(): React.JSX.Element {
     if (!target) return
     try {
       const saved = await window.api.writeFile(target, bytes)
+      window.api.olay('kaydet')
       flash(`Kaydedildi: ${saved}`)
     } catch {
       flash('Kaydedilemedi')
@@ -117,6 +130,7 @@ export default function App(): React.JSX.Element {
       editingRef.current = true
       try {
         await docApi.replaceBytes(await fn(bytes))
+        window.api.olay('duzenle')
         flash(okMsg)
       } catch {
         flash(failMsg)
@@ -182,7 +196,10 @@ export default function App(): React.JSX.Element {
     [docApi, flash]
   )
 
-  const togglePip = useCallback(() => void window.api.pipToggle(), [])
+  const togglePip = useCallback(() => {
+    window.api.olay('pip')
+    void window.api.pipToggle()
+  }, [])
 
   const scrollToPage = useCallback(
     (n: number) => {

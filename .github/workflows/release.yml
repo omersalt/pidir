@@ -1,0 +1,46 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+# electron-builder, GITHUB_TOKEN ile Release'e dosya yükleyecek; varsayılan salt-okunur
+# izin bunun için yetmez.
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # electron-builder, Release'i package.json'daki sürümden ("v" + version) bulur —
+      # itilen etiketten DEĞİL. İkisi ayrışırsa derleme sessizce yanlış/boş bir Release'e
+      # yüklenir. Bu yüzden en başta karşılaştırıp ayrışmayı burada patlatıyoruz.
+      - name: Etiket ile package.json sürümünü doğrula
+        shell: bash
+        run: |
+          etiket="${GITHUB_REF_NAME#v}"
+          surum="$(node -p "require('./package.json').version")"
+          if [ "$etiket" != "$surum" ]; then
+            echo "Etiket ($GITHUB_REF_NAME) package.json sürümüyle ($surum) uyuşmuyor." >&2
+            exit 1
+          fi
+
+      # postinstall: electron-builder install-app-deps + Tesseract dil verisini kopyalar.
+      - run: npm ci
+
+      # build:win = typecheck + electron-vite build + electron-builder --win.
+      # Ek argümanlar npm tarafından betiğin SONUNA eklenir, yani electron-builder'a geçer.
+      # "--publish always": varsayılan onTagOrDraft davranışına güvenmek yerine yüklemeyi
+      # açıkça istiyoruz.
+      - run: npm run build:win -- --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

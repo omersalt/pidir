@@ -6,6 +6,8 @@ import { createWindow, activeWindow, sendOpenPaths, setCaptionSymbols } from './
 import { buildMenu } from './menu'
 import { registerIpc } from './register-ipc'
 import { registerOcrProtocol, registerOcrSchemePrivileged } from './ocr-assets'
+import { guncellemeyiBaslat } from './guncelleyici'
+import { telemetriBaslat, telemetriKapat } from './telemetri'
 
 app.setName('Pidır')
 
@@ -50,10 +52,15 @@ if (!gotLock) {
     })
 
     registerIpc()
+    telemetriBaslat()
 
     buildMenu()
     createWindow(startupPaths)
     startupPaths = []
+
+    // Güncelleme kontrolü kendi içinde 10 sn geciktirilir ve electron-updater'ı ancak
+    // o zaman yükler — pencere çizimi bu satırdan etkilenmez.
+    guncellemeyiBaslat()
 
     nativeTheme.on('updated', () => {
       const bg = nativeTheme.shouldUseDarkColors ? FALLBACK_BG.dark : FALLBACK_BG.light
@@ -71,4 +78,16 @@ if (!gotLock) {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
+})
+
+// Kapanışta son telemetri paketini gönder. Electron `before-quit` dinleyicilerini
+// AWAIT ETMEZ; `async` bir dinleyici yazsaydık uygulama kapanır, istek yarıda kesilir
+// ve `kapanis` olayı hiç gitmezdi. Doğrusu: çıkışı bir kez ertele, iş bitince yeniden
+// quit çağır. `kapanisYapildi` bayrağı sonsuz döngüyü engelliyor.
+let kapanisYapildi = false
+app.on('before-quit', (olay) => {
+  if (kapanisYapildi) return
+  olay.preventDefault()
+  kapanisYapildi = true
+  void telemetriKapat().finally(() => app.quit())
 })

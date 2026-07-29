@@ -2,6 +2,8 @@ import { basename, join } from 'path'
 import { existsSync } from 'fs'
 import { readFile, readdir, stat } from 'fs/promises'
 import { docxToPdf, isDocx } from './docx'
+import { csvToPdf, isCsv, isJson, jsonToPdf } from './tablo'
+import { olayYaz } from './telemetri'
 
 export interface OpenedFile {
   name: string
@@ -9,22 +11,42 @@ export interface OpenedFile {
   path?: string
 }
 
-export const IMPORTABLE = /\.(pdf|pdfx|docx|png|jpe?g|webp|gif|bmp|avif|txt|rtf|svg|html?)$/i
+export const IMPORTABLE =
+  /\.(pdf|pdfx|docx|csv|tsv|json|jsonl|ndjson|png|jpe?g|webp|gif|bmp|avif|txt|rtf|svg|html?)$/i
 
 export function collectFileArgs(argv: string[]): string[] {
-  return argv.filter((arg) => /\.(pdf|pdfx|docx)$/i.test(arg) && existsSync(arg))
+  return argv.filter(
+    (arg) => /\.(pdf|pdfx|docx|csv|tsv|json|jsonl|ndjson)$/i.test(arg) && existsSync(arg)
+  )
 }
+
+/** Uzantıyı .pdf yapar — çevrilen belgeler okuyucuya PDF olarak iner. */
+const pdfAdi = (yol: string): string => basename(yol).replace(/\.[^./\\]+$/, '.pdf')
 
 export async function readFiles(paths: string[]): Promise<OpenedFile[]> {
   return Promise.all(
     paths.map(async (p) => {
       const data = new Uint8Array(await readFile(p))
-      // DOCX açılırken PDF'e çevrilir; okuyucu tarafı tek bir biçim görür.
+      const boyutKb = Math.round(data.byteLength / 1024)
+      // DOCX/CSV/JSON açılırken PDF'e çevrilir; okuyucu tarafı tek bir biçim görür.
       // Dönüşüm başarısız olursa dosya sessizce yutulmaz — hata yukarı taşınır.
+      // DİKKAT: telemetriye yalnız TÜR ve BOYUT gider; dosya adı/yolu ASLA gönderilmez.
       if (isDocx(p)) {
         const pdf = await docxToPdf(data)
-        return { name: basename(p).replace(/\.docx$/i, '.pdf'), data: pdf, path: p }
+        olayYaz('belge_acildi', { tur: 'docx', boyutKb })
+        return { name: pdfAdi(p), data: pdf, path: p }
       }
+      if (isCsv(p)) {
+        const pdf = await csvToPdf(data, basename(p))
+        olayYaz('belge_acildi', { tur: 'csv', boyutKb })
+        return { name: pdfAdi(p), data: pdf, path: p }
+      }
+      if (isJson(p)) {
+        const pdf = await jsonToPdf(data, basename(p))
+        olayYaz('belge_acildi', { tur: 'json', boyutKb })
+        return { name: pdfAdi(p), data: pdf, path: p }
+      }
+      olayYaz('belge_acildi', { tur: 'pdf', boyutKb })
       return { name: basename(p), data, path: p }
     })
   )

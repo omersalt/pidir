@@ -18,6 +18,8 @@ import {
   setCaptionSymbols
 } from './window'
 import { runSidecar, SidecarRequest } from './sidecar'
+import { olayYaz } from './telemetri'
+import { guncellemeDurumu } from './guncelleyici'
 
 const MAX_WRITE_BYTES = 1024 * 1024 * 1024 // 1 GiB cap on a single IPC write
 
@@ -45,6 +47,14 @@ export function registerIpc(): void {
   )
 
   ipcMain.handle('pdfx:renderer-ready', (e) => markReady(senderWin(e)))
+
+  // Arayüzün hangi özelliğin kullanıldığını bildirmesi için tek uç. Girdi serbest metin
+  // olduğundan telemetri modülü kendi içinde kırpıyor; burada yalnız tür kontrolü yapılır.
+  ipcMain.handle('pdfx:olay', (_event, ad: unknown) => {
+    if (typeof ad === 'string' && ad) olayYaz('ozellik', { ad: ad.slice(0, 40) })
+  })
+
+  ipcMain.handle('pdfx:update-status', () => guncellemeDurumu())
 
   ipcMain.handle(
     'pdfx:choose-save-path',
@@ -125,9 +135,11 @@ export function registerIpc(): void {
       title: 'Belge Aç',
       properties: ['openFile', 'multiSelections'],
       filters: [
-        { name: 'Belgeler', extensions: ['pdf', 'docx'] },
+        { name: 'Belgeler', extensions: ['pdf', 'docx', 'csv', 'tsv', 'json', 'jsonl', 'ndjson'] },
         { name: 'PDF', extensions: ['pdf'] },
         { name: 'Word Belgesi', extensions: ['docx'] },
+        { name: 'Tablo (CSV)', extensions: ['csv', 'tsv'] },
+        { name: 'JSON', extensions: ['json', 'jsonl', 'ndjson'] },
         { name: 'Tüm Dosyalar', extensions: ['*'] }
       ]
     })
