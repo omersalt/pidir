@@ -1,0 +1,95 @@
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
+
+export interface OpenedFile {
+  name: string
+  data: Uint8Array
+  path?: string
+}
+
+export type ZoomAction = 'in' | 'out' | 'reset'
+
+export type MenuAction = 'open' | 'save-pdf'
+
+export interface SidecarRequest {
+  cmd: 'rotate' | 'sadelestir'
+  pageIndex?: number
+  degrees?: number
+  topMm?: number
+  bottomMm?: number
+}
+
+export interface SaveFilter {
+  name: string
+  extensions: string[]
+}
+
+const api = {
+  platform: process.platform,
+  rendererReady: (): Promise<void> => ipcRenderer.invoke('pdfx:renderer-ready'),
+  chooseSavePath: (defaultName: string, filter?: SaveFilter): Promise<string | null> =>
+    ipcRenderer.invoke('pdfx:choose-save-path', defaultName, filter),
+  readClipboardImage: (): Promise<Uint8Array | null> =>
+    ipcRenderer.invoke('pdfx:read-clipboard-image'),
+  readClipboardFiles: (): Promise<OpenedFile[]> => ipcRenderer.invoke('pdfx:read-clipboard-files'),
+  clearClipboard: (): Promise<void> => ipcRenderer.invoke('pdfx:clipboard-clear'),
+  getPathForFile: (file: File): string => webUtils.getPathForFile(file),
+  expandDropPaths: (paths: string[]): Promise<OpenedFile[]> =>
+    ipcRenderer.invoke('pdfx:expand-drop-paths', paths),
+  readResource: (
+    htmlPath: string,
+    ref: string
+  ): Promise<{ data: Uint8Array; mime: string } | null> =>
+    ipcRenderer.invoke('pdfx:read-resource', htmlPath, ref),
+  markupToPdf: (html: string, fitPageHeightPx?: number): Promise<Uint8Array> =>
+    ipcRenderer.invoke('pdfx:markup-to-pdf', html, fitPageHeightPx),
+  writeFile: (path: string, data: Uint8Array): Promise<string> =>
+    ipcRenderer.invoke('pdfx:write-file', path, data),
+  openFiles: (): Promise<OpenedFile[]> => ipcRenderer.invoke('pdfx:open-files'),
+  newWindow: (): Promise<void> => ipcRenderer.invoke('pdfx:new-window'),
+  captionSymbols: (visible: boolean): Promise<void> =>
+    ipcRenderer.invoke('pdfx:caption-symbols', visible),
+  winMinimize: (): Promise<void> => ipcRenderer.invoke('pdfx:win-minimize'),
+  winMaximizeToggle: (): Promise<boolean> => ipcRenderer.invoke('pdfx:win-maximize-toggle'),
+  winClose: (): Promise<void> => ipcRenderer.invoke('pdfx:win-close'),
+  pipToggle: (): Promise<boolean> => ipcRenderer.invoke('pdfx:pip-toggle'),
+  pipState: (): Promise<boolean> => ipcRenderer.invoke('pdfx:pip-state'),
+  pipOpacity: (value: number): Promise<void> => ipcRenderer.invoke('pdfx:pip-opacity', value),
+  sidecar: (input: Uint8Array, request: SidecarRequest): Promise<Uint8Array> =>
+    ipcRenderer.invoke('pdfx:sidecar', input, request),
+  onPipChanged: (callback: (pip: boolean) => void): (() => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, pip: boolean): void => callback(pip)
+    ipcRenderer.on('pdfx:pip-changed', listener)
+    return () => ipcRenderer.removeListener('pdfx:pip-changed', listener)
+  },
+  onFilesOpened: (callback: (files: OpenedFile[]) => void): (() => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, files: OpenedFile[]): void =>
+      callback(files)
+    ipcRenderer.on('pdfx:files-opened', listener)
+    return () => ipcRenderer.removeListener('pdfx:files-opened', listener)
+  },
+  onZoom: (callback: (action: ZoomAction) => void): (() => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, action: ZoomAction): void =>
+      callback(action)
+    ipcRenderer.on('pdfx:zoom', listener)
+    return () => ipcRenderer.removeListener('pdfx:zoom', listener)
+  },
+  onMenu: (callback: (action: MenuAction) => void): (() => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, action: MenuAction): void =>
+      callback(action)
+    ipcRenderer.on('pdfx:menu', listener)
+    return () => ipcRenderer.removeListener('pdfx:menu', listener)
+  }
+}
+
+export type PdfxApi = typeof api
+
+if (process.contextIsolated) {
+  try {
+    contextBridge.exposeInMainWorld('api', api)
+  } catch (error) {
+    console.error(error)
+  }
+} else {
+  // @ts-ignore
+  window.api = api
+}

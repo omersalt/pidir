@@ -1,0 +1,8 @@
+{
+  "name": "pdfx-native-glass",
+  "version": "1.0.0",
+  "private": true,
+  "description": "macOS liquid-glass window backdrop (Objective-C++ N-API addon)",
+  "main": "build/Release/glass.node",
+  "gypfile": true
+}

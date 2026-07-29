@@ -1,0 +1,51 @@
+{
+  "name": "pidir",
+  "productName": "Pidır",
+  "version": "0.1.0",
+  "description": "Pidır — sade PDF okuma ve düzenleme. İçerik = arayüz.",
+  "main": "./out/main/index.js",
+  "author": "Ömer Salt",
+  "license": "MIT",
+  "scripts": {
+    "format": "prettier --write .",
+    "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
+    "typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false",
+    "typecheck": "npm run typecheck:node && npm run typecheck:web",
+    "start": "electron-vite preview",
+    "dev": "electron-vite dev --watch",
+    "build": "npm run typecheck && electron-vite build",
+    "postinstall": "electron-builder install-app-deps && node scripts/copy-ocr-assets.mjs",
+    "build:unpack": "npm run build && electron-builder --dir",
+    "build:win": "npm run build && electron-builder --win"
+  },
+  "dependencies": {
+    "@electron-toolkit/preload": "3.0.2",
+    "@electron-toolkit/utils": "4.0.0"
+  },
+  "devDependencies": {
+    "@electron-toolkit/tsconfig": "1.0.1",
+    "@tesseract.js-data/eng": "1.0.0",
+    "@tesseract.js-data/tur": "1.0.0",
+    "@types/d3-selection": "3.0.11",
+    "@types/d3-zoom": "3.0.8",
+    "@types/node": "22.19.21",
+    "@types/react": "19.2.17",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "4.7.0",
+    "d3-selection": "3.0.0",
+    "d3-zoom": "3.0.0",
+    "electron": "38.4.0",
+    "electron-builder": "25.1.8",
+    "electron-vite": "4.0.1",
+    "fflate": "0.8.3",
+    "pdf-lib": "1.17.1",
+    "pdfjs-dist": "5.7.284",
+    "prettier": "3.8.4",
+    "react": "19.2.7",
+    "react-dom": "19.2.7",
+    "tesseract.js": "7.0.0",
+    "tesseract.js-core": "7.0.0",
+    "typescript": "5.9.3",
+    "vite": "7.3.5"
+  }
+}

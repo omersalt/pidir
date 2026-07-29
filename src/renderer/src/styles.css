@@ -1,0 +1,687 @@
+:root {
+  color-scheme: dark light;
+
+  --app-bg: #131316;
+  --surface: #ffffff;
+  --ink: rgba(255, 255, 245, 0.92);
+  --ink-soft: rgba(255, 255, 245, 0.6);
+  --ink-faint: rgba(255, 255, 245, 0.4);
+  --hairline: rgba(255, 255, 255, 0.14);
+  --accent: rgba(255, 255, 245, 0.92);
+  --accent-ink: #1a1a1c;
+  --accent-hover: #ffffff;
+  --select: #74a9ff;
+  --danger: #ff6b6b;
+  --hover: rgba(255, 255, 255, 0.08);
+  --control: rgba(255, 255, 255, 0.12);
+  --overlay-strong: #1a1a1e;
+  --scrollbar-thumb: rgba(255, 255, 255, 0.18);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.3);
+  --page-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.36);
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --app-bg: #f4f4f2;
+    --surface: #ffffff;
+    --ink: #16161a;
+    --ink-soft: #55555c;
+    --ink-faint: #8e8e94;
+    --hairline: #e2e2de;
+    --accent: #16161a;
+    --accent-ink: #ffffff;
+    --accent-hover: #2e2e34;
+    --select: #3b82f6;
+    --danger: #d64545;
+    --hover: rgba(22, 22, 26, 0.06);
+    --control: rgba(255, 255, 255, 0.92);
+    --overlay-strong: #ffffff;
+    --scrollbar-thumb: rgba(22, 22, 26, 0.16);
+    --scrollbar-thumb-hover: rgba(22, 22, 26, 0.32);
+    --page-shadow: 0 1px 2px rgba(20, 20, 24, 0.09), 0 6px 20px rgba(20, 20, 24, 0.08);
+  }
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', 'Helvetica Neue', Arial, sans-serif;
+  background: var(--app-bg);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* ---------- Düğmeler ---------- */
+.btn {
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  border: none;
+  border-radius: 8px;
+  padding: 7px 16px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, opacity 0.15s ease, transform 0.05s ease;
+}
+.btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+.btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.btn.primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.btn.primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+.btn.ghost {
+  background: transparent;
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--hairline);
+}
+.btn.ghost:hover:not(:disabled) {
+  background: var(--hover);
+}
+.btn.ghost.danger {
+  color: var(--danger);
+}
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ink-faint);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.icon-btn:hover:not(:disabled) {
+  background: var(--hover);
+  color: var(--ink);
+}
+.icon-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+/* ---------- Kök + okuyucu ---------- */
+.reader-root {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Çerçevesiz pencereyi taşımak için kalıcı, görünmez sürükleme şeridi (üst kenar).
+   Üst çubuk gizliyken bile pencere hareket ettirilebilsin diye HER ZAMAN vardır. */
+.win-drag {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 34px;
+  z-index: 5;
+  -webkit-app-region: drag;
+}
+.win-drag.win {
+  right: 140px; /* sağ üstteki native düğmeleri örtme → büyüt hover'ında snap layouts açılır */
+}
+.win-drag.mac {
+  left: 80px;
+}
+
+.reader-scroll {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+  outline: none;
+}
+
+.reader-column {
+  min-width: 100%;
+  width: max-content;
+  margin: 0 auto;
+  /* dikey/yatay dolgu Reader.tsx'te inline (READER_PAD_Y / READER_PAD_X) verilir */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.reader-page {
+  position: relative;
+  flex: none;
+  background: var(--surface);
+  border-radius: 3px;
+  box-shadow: var(--page-shadow);
+  overflow: hidden;
+}
+
+/* PageView (pdfx'ten devralınan render katmanı) */
+.pageview {
+  position: absolute;
+  inset: 0;
+}
+.pageview-base {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.pageview-base.ready {
+  opacity: 1;
+}
+.pageview-detail {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+/* Arama vurgu katmanları (find-highlight) */
+.find-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  overflow: clip;
+  line-height: 1;
+  text-align: initial;
+  transform-origin: 0 0;
+  pointer-events: none;
+  mix-blend-mode: multiply;
+  --min-font-size: 1;
+  --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+  --min-font-size-inv: calc(1 / var(--min-font-size));
+}
+.find-layer > span {
+  position: absolute;
+  color: transparent;
+  white-space: pre;
+  transform-origin: 0 0;
+  --font-height: 0;
+  --scale-x: 1;
+  --rotate: 0deg;
+  font-size: calc(var(--text-scale-factor) * var(--font-height));
+  transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
+}
+.find-hit {
+  border-radius: 1px;
+  background-color: #ffd54a;
+}
+.ocr-highlight-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  overflow: clip;
+  pointer-events: none;
+  mix-blend-mode: multiply;
+}
+.ocr-highlight {
+  position: absolute;
+  border-radius: 1px;
+  background-color: #ffd54a;
+}
+
+/* ---------- Üst çubuk (hover'da beliren) ---------- */
+.topbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 46px;
+  padding: 0 14px;
+  background: var(--overlay-strong);
+  box-shadow: 0 1px 0 var(--hairline), 0 8px 24px rgba(0, 0, 0, 0.18);
+  opacity: 0;
+  transform: translateY(-8px);
+  pointer-events: none;
+  transition: opacity 0.16s ease, transform 0.16s ease;
+  -webkit-app-region: drag;
+}
+.topbar.show {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+.topbar.win {
+  padding-right: 148px; /* sağ üstteki native min/max/kapat (snap layouts) düğmelerine yer bırak */
+}
+.topbar.mac {
+  padding-left: 82px;
+}
+/* Sağdaki pencere düğmeleri (küçült/büyüt/kapat) — app düğmelerinden ince çizgiyle ayrık.
+   Yalnız hover üst çubuğunda görünür (native başlık çubuğu yok). */
+.topbar-winctrls {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  margin-left: 6px;
+  padding-left: 6px;
+  border-left: 1px solid var(--hairline);
+}
+.win-ctrl {
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+}
+.win-ctrl.close:hover:not(:disabled) {
+  background: #e33;
+  color: #fff;
+}
+.topbar button {
+  -webkit-app-region: no-drag;
+}
+.topbar-name {
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  padding: 4px 8px;
+  max-width: 46vw;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.topbar-name:hover {
+  background: var(--hover);
+}
+.topbar-spacer {
+  flex: 1;
+}
+.topbar-page {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.topbar-cluster {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.topbar-pct {
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-soft);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  min-width: 48px;
+  padding: 5px 4px;
+  cursor: pointer;
+}
+.topbar-pct:hover {
+  background: var(--hover);
+}
+
+/* ---------- Alt-orta sayfa göstergesi ---------- */
+.page-pill {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 15;
+  font-size: 12px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-soft);
+  background: var(--overlay-strong);
+  border-radius: 999px;
+  padding: 5px 13px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.22), inset 0 0 0 1px var(--hairline);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+.page-pill.show {
+  opacity: 1;
+}
+
+/* PiP modunda hover'da beliren çıkış+kapat kümesi (üst çubuk PiP'te gizli). */
+.pip-controls {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 25;
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 8px;
+  background: var(--overlay-strong);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3), inset 0 0 0 1px var(--hairline);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+  -webkit-app-region: no-drag;
+}
+.pip-controls.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ---------- Findbar ---------- */
+.findbar {
+  position: absolute;
+  top: 54px;
+  right: 18px;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 6px 0 12px;
+  border-radius: 999px;
+  background: var(--overlay-strong);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3), inset 0 0 0 1px var(--hairline);
+  animation: findbar-in 0.16s ease;
+}
+@keyframes findbar-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+.findbar-icon {
+  display: flex;
+  color: var(--ink-faint);
+}
+.findbar-input {
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  background: transparent;
+  border: none;
+  outline: none;
+  width: 200px;
+  padding: 0;
+}
+.findbar-input::placeholder {
+  color: var(--ink-faint);
+}
+.findbar-count {
+  font-size: 12px;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.findbar-status {
+  font-size: 12px;
+  color: var(--ink-faint);
+  white-space: nowrap;
+  animation: findbar-pulse 1.4s ease-in-out infinite;
+}
+@keyframes findbar-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+.findbar-lang {
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--ink-soft);
+  background: var(--hover);
+  border: none;
+  border-radius: 6px;
+  padding: 3px 6px;
+  cursor: pointer;
+  outline: none;
+}
+.findbar .icon-btn {
+  width: 24px;
+  height: 24px;
+}
+
+/* ---------- Bağlam menüsü ---------- */
+.menu {
+  position: fixed;
+  z-index: 50;
+  min-width: 220px;
+  padding: 6px;
+  background: var(--overlay-strong);
+  border-radius: 10px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.36), inset 0 0 0 1px var(--hairline);
+  animation: menu-in 0.12s ease;
+}
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+.menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  width: 100%;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  padding: 7px 10px;
+  cursor: pointer;
+  text-align: left;
+}
+.menu-item:hover:not(:disabled) {
+  background: var(--hover);
+}
+.menu-item:disabled {
+  opacity: 0.38;
+  cursor: default;
+}
+.menu-shortcut {
+  font-size: 12px;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+.menu-sep {
+  height: 1px;
+  background: var(--hairline);
+  margin: 6px 8px;
+}
+
+/* ---------- Sayfa yöneticisi ---------- */
+.pagemgr {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  display: flex;
+  flex-direction: column;
+  background: var(--app-bg);
+}
+.pagemgr-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  height: 54px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--hairline);
+  -webkit-app-region: drag;
+}
+.pagemgr-bar button,
+.pagemgr-actions {
+  -webkit-app-region: no-drag;
+}
+.pagemgr-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+.pagemgr-count {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+.pagemgr-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+.pagemgr-actions .btn {
+  padding: 6px 12px;
+  font-size: 12.5px;
+}
+.pagemgr-grid {
+  flex: 1;
+  overflow: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 18px;
+  padding: 22px;
+  justify-items: center;
+  align-content: start;
+}
+.pmthumb {
+  position: relative;
+  border-radius: 6px;
+  cursor: pointer;
+  outline: 3px solid transparent;
+  outline-offset: 2px;
+  transition: outline-color 0.12s ease;
+}
+.pmthumb.selected {
+  outline-color: var(--select);
+}
+.pmthumb.over {
+  outline-color: var(--ink-faint);
+}
+.pmthumb-page {
+  position: relative;
+  background: var(--surface);
+  border-radius: 4px;
+  box-shadow: var(--page-shadow);
+  overflow: hidden;
+}
+.pmthumb-num {
+  position: absolute;
+  bottom: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Boş ekran ---------- */
+.empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  /* Boş ekranda etkileşilecek tek şey ortadaki karttır; arka planın TAMAMINI
+     pencere-taşıma bölgesi yap (kart hariç). Böylece pencereyi her yerinden tutup
+     taşıyabilirsin. */
+  -webkit-app-region: drag;
+}
+.empty-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+  border: 1.5px dashed var(--hairline);
+  border-radius: 20px;
+  padding: 60px 72px;
+  transition: opacity 0.15s ease, border-color 0.15s ease;
+  /* Kart tıklanabilir (PDF Aç / Son dosya) + dosya-bırakma hedefi kalır. */
+  -webkit-app-region: no-drag;
+}
+.empty-card.drag {
+  border-color: var(--select);
+  opacity: 0.6;
+}
+.empty-glyph {
+  color: var(--ink-faint);
+}
+.empty-card h1 {
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.empty-sub {
+  font-size: 13.5px;
+  color: var(--ink-soft);
+}
+.empty-card .btn {
+  margin-top: 4px;
+}
+
+/* ---------- Toast ---------- */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  font-size: 13px;
+  font-weight: 500;
+  background: var(--accent);
+  color: var(--accent-ink);
+  padding: 9px 18px;
+  border-radius: 999px;
+  box-shadow: 0 8px 28px rgba(20, 20, 24, 0.3);
+  animation: toast-in 0.2s ease;
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+/* ---------- Kaydırma çubukları ---------- */
+.reader-scroll::-webkit-scrollbar,
+.pagemgr-grid::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+.reader-scroll::-webkit-scrollbar-thumb,
+.pagemgr-grid::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 8px;
+  background-clip: padding-box;
+  border: 3px solid transparent;
+}
+.reader-scroll::-webkit-scrollbar-thumb:hover,
+.pagemgr-grid::-webkit-scrollbar-thumb:hover {
+  background-color: var(--scrollbar-thumb-hover);
+}
+.reader-scroll::-webkit-scrollbar-track,
+.pagemgr-grid::-webkit-scrollbar-track {
+  background: transparent;
+}

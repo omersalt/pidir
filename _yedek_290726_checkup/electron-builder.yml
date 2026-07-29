@@ -1,0 +1,49 @@
+appId: com.pidir.app
+productName: Pidır
+directories:
+  buildResources: build
+files:
+  - '**/*'
+  - '!**/.vscode/*'
+  - '!src/**'
+  - '!arac/**'
+  - '!_pdfx-kaynak/**'
+  - '!electron.vite.config.{js,ts,mjs,cjs}'
+  - '!{.prettierignore,.prettierrc.yaml,.editorconfig,dev-app-update.yml,README.md,SPEC.md,PLAN.md}'
+  - '!{.env,.env.*,.npmrc,pnpm-lock.yaml,yarn.lock}'
+  - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+  - '!scripts/**'
+  - '!resources/**'
+  - '!*.pdf'
+  - '!_*'
+# Türkçe + İngilizce OCR verisini (tesseract) uygulama yanında taşı.
+extraResources:
+  - from: resources/ocr
+    to: ocr
+  - from: arac/pidir_sidecar.py
+    to: arac/pidir_sidecar.py
+  - from: arac/pidir_docx.py
+    to: arac/pidir_docx.py
+# NOT: "Sadeleştir" özelliği yerel Python + PyMuPDF sidecar'ına ihtiyaç duyar
+# (arac/pidir_sidecar.py ayrıca teslim edilir). Okuma/sayfa düzenleme kendi kendine yeter.
+fileAssociations:
+  - ext: pdf
+    name: PDF Belgesi
+    description: PDF Belgesi
+    role: Viewer
+  - ext: docx
+    name: Word Belgesi
+    description: Word Belgesi
+    role: Viewer
+win:
+  executableName: pidir
+  target:
+    - portable
+portable:
+  artifactName: ${productName}-${version}-portable.${ext}
+nsis:
+  artifactName: ${name}-${version}-kurulum.${ext}
+  shortcutName: ${productName}
+  uninstallDisplayName: ${productName}
+  createDesktopShortcut: always
+npmRebuild: false

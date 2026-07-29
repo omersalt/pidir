@@ -1,0 +1,4 @@
+portable (1. soguk)   : 4746 ms
+portable (2. sicak)   : 4649 ms
+unpacked (1.)         : 794 ms
+unpacked (2.)         : 291 ms
