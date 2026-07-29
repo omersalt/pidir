@@ -1,7 +1,7 @@
-﻿# Kurulum SONRASI acilis olcumu: kurulu Pidir vs eski portable.
+﻿# Pidir acilis suresi olcumu: yeni kullanici-kapsamli kurulum vs eski portable.
 $ErrorActionPreference = 'Continue'
 $pdf = 'C:\Users\Ömer Salt\Downloads\hair experiment.pdf'
-$kurulu = 'C:\Program Files\LLM Programları\Pidır\pidir\pidir.exe'
+$kurulu = "$env:LOCALAPPDATA\Programs\pidir\pidir.exe"
 $portable = 'C:\PidirDev\dist\Pidır-0.1.0-portable.exe'
 
 function Olc([string]$exe, [string]$etiket) {
@@ -25,8 +25,9 @@ function Olc([string]$exe, [string]$etiket) {
     Start-Sleep -Milliseconds 500
 }
 
+"kurulu exe : $kurulu"
 ".pdf komutu: " + (Get-ItemProperty 'HKCU:\SOFTWARE\Classes\pdf_auto_file\shell\open\command' -EA SilentlyContinue).'(default)'
 ""
-Olc $kurulu   'KURULU (1. soguk)'
-Olc $kurulu   'KURULU (2. sicak)'
+Olc $kurulu   'YENI (1. soguk)'
+Olc $kurulu   'YENI (2. sicak)'
 Olc $portable 'ESKI portable'
