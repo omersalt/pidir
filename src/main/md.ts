@@ -29,10 +29,13 @@ const KOYU: Palet = {
 // A4 sayfa + doğal sayfalama (preferCSSPageSize markup.ts'te açık).
 function githubCss(p: Palet): string {
   return `
-@page { size: A4; margin: 16mm 15mm; }
+/* margin: 0 → sayfanın "kâğıt" kenar boşluğu YOK (koyu modda beyaz bar yapıyordu).
+   Boşluk body padding'ine taşındı: koyu zemin kâğıdın ta kenarına kadar dolar. */
+@page { size: A4; margin: 0; }
 * { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; }
+html { margin: 0; padding: 0; background: ${p.bg}; }
 body {
+  margin: 0; padding: 16mm 15mm;
   font: 15px/1.6 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   color: ${p.fg}; background: ${p.bg};
   -webkit-print-color-adjust: exact; print-color-adjust: exact;
@@ -108,9 +111,10 @@ export async function txtToPdf(data: Uint8Array, name: string): Promise<Uint8Arr
   const metin = escapeHtml(utf8(data))
   const title = basename(name).replace(/\.[^.]+$/, '')
   const css = `
-@page { size: A4; margin: 16mm 15mm; }
-html, body { margin: 0; padding: 0; }
+@page { size: A4; margin: 0; }
+html { margin: 0; padding: 0; background: ${p.bg}; }
 body {
+  margin: 0; padding: 16mm 15mm;
   color: ${p.fg}; background: ${p.bg};
   -webkit-print-color-adjust: exact; print-color-adjust: exact;
 }
