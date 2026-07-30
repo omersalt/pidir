@@ -21,3 +21,10 @@ native/build/
 *.mobileprovision
 
 resources/ocr
+
+# Thumbnail DLL derleme ciktilari (kaynak: thumb/*.cpp + build_*.bat)
+thumb/*.exe
+thumb/*.obj
+thumb/*.dll
+thumb/*.lib
+thumb/*.exp
