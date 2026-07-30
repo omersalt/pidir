@@ -50,6 +50,17 @@ export default function App(): React.JSX.Element {
 
   const docApi = useReaderDoc(flash)
   const { doc } = docApi
+
+  // Dosyayla açılışta pencere, belge hazır olana dek GİZLİ tutulur (main süreç);
+  // ilk belge boyanınca burada main'e haber verilir → pencere o an gösterilir, böylece
+  // boş karşılama ekranı hiç parlamamış olur. İki rAF = ilk kare gerçekten boyandı.
+  const ilkGosterimYapildi = useRef(false)
+  useEffect(() => {
+    if (doc && !ilkGosterimYapildi.current) {
+      ilkGosterimYapildi.current = true
+      requestAnimationFrame(() => requestAnimationFrame(() => void window.api.firstDocReady()))
+    }
+  }, [doc])
   const docs = useMemo<DocEntry[]>(() => (doc ? [doc] : []), [doc])
   const view = useReaderView(doc, scrollerRef)
 

@@ -26,6 +26,8 @@ export interface SaveFilter {
 const api = {
   platform: process.platform,
   rendererReady: (): Promise<void> => ipcRenderer.invoke('pdfx:renderer-ready'),
+  /** İlk belge boyandığında ana sürece haber ver → pencere o an gösterilir. */
+  firstDocReady: (): Promise<void> => ipcRenderer.invoke('pdfx:first-doc-ready'),
   chooseSavePath: (defaultName: string, filter?: SaveFilter): Promise<string | null> =>
     ipcRenderer.invoke('pdfx:choose-save-path', defaultName, filter),
   readClipboardImage: (): Promise<Uint8Array | null> =>

@@ -15,7 +15,8 @@ import {
   minimizeWindow,
   toggleMaximize,
   closeWindow,
-  setCaptionSymbols
+  setCaptionSymbols,
+  revealWindow
 } from './window'
 import { runSidecar, SidecarRequest } from './sidecar'
 import { openInEditor, isMarkdown, isText } from './md'
@@ -48,6 +49,9 @@ export function registerIpc(): void {
   )
 
   ipcMain.handle('pdfx:renderer-ready', (e) => markReady(senderWin(e)))
+
+  // İlk belge boyandı → dosya-bekleyen pencereyi şimdi göster (boş ekran parlamasın).
+  ipcMain.handle('pdfx:first-doc-ready', (e) => revealWindow(senderWin(e)))
 
   // Kaynağı dış editörde aç (Ctrl+E). YALNIZ .md/.markdown yollarını kabul eder —
   // PİDİR .md'yi kendi düzenlemez; düzenleme her zaman Sublime/Notepad'de yapılır.

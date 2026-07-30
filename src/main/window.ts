@@ -17,15 +17,23 @@ interface WinState {
   pipBounds: Electron.Rectangle | null
   pipWasMax: boolean
   pending: string[]
+  reveal: (() => void) | null
 }
 const stateMap = new WeakMap<BrowserWindow, WinState>()
 function st(win: BrowserWindow): WinState {
   let s = stateMap.get(win)
   if (!s) {
-    s = { ready: false, pipBounds: null, pipWasMax: false, pending: [] }
+    s = { ready: false, pipBounds: null, pipWasMax: false, pending: [], reveal: null }
     stateMap.set(win, s)
   }
   return s
+}
+
+/** Dosya-bekleyen bir pencereyi belge hazır olduğunda göster. renderer
+ * 'first-doc-ready' deyince çağrılır → boş karşılama ekranı hiç görünmez. */
+export function revealWindow(win: BrowserWindow | null): void {
+  if (!win || win.isDestroyed()) return
+  st(win).reveal?.()
 }
 
 /** Menü hızlandırıcıları / diyaloglar için etkin (okuyucu) pencere. Gizli render
@@ -208,13 +216,35 @@ export function createWindow(openPaths: string[] = []): BrowserWindow {
 
   readerWindows.add(win)
   if (openPaths.length) st(win).pending.push(...openPaths)
+  // Dosya beklenen pencere: boş karşılama ekranı anlık parlamasın diye belge
+  // hazır olana dek GİZLİ tut (aşağıda ready-to-show + reveal ile).
+  const expectsFile = openPaths.length > 0
 
   // Oranı kilitle: belge yüklense de kendiliğinden bozulmaz; kullanıcı elle
   // boyutlandırınca da 21:30 korunur (PiP setBounds programatik olduğundan muaf).
   win.setAspectRatio(ASPECT)
 
-  win.on('ready-to-show', () => win.show())
+  let revealTimer: ReturnType<typeof setTimeout> | null = null
+  const doReveal = (): void => {
+    if (revealTimer) {
+      clearTimeout(revealTimer)
+      revealTimer = null
+    }
+    if (!win.isDestroyed() && !win.isVisible()) win.show()
+  }
+  st(win).reveal = doReveal
+
+  win.on('ready-to-show', () => {
+    if (!expectsFile) {
+      win.show() // dosya yok → karşılama ekranı zaten istenen görünüm, hemen göster
+      return
+    }
+    // Dosya bekleniyor: belge boyanınca renderer 'first-doc-ready' → doReveal.
+    // Yedek: 4 sn sonra yine de göster (yükleme çökerse pencere hep gizli kalmasın).
+    revealTimer = setTimeout(doReveal, 4000)
+  })
   win.on('closed', () => {
+    if (revealTimer) clearTimeout(revealTimer)
     stateMap.delete(win)
     readerWindows.delete(win)
     // Son okuyucu penceresi kapandıysa gizli render penceresini de kapat →
