@@ -2,7 +2,13 @@ import { app, nativeTheme, BrowserWindow } from 'electron'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
 import { FALLBACK_BG } from './theme'
 import { collectFileArgs } from './file-intake'
-import { createWindow, activeWindow, sendOpenPaths, setCaptionSymbols } from './window'
+import {
+  createWindow,
+  activeWindow,
+  sendOpenPaths,
+  setCaptionSymbols,
+  showAndFocus
+} from './window'
 import { buildMenu } from './menu'
 import { registerIpc } from './register-ipc'
 import { registerOcrProtocol, registerOcrSchemePrivileged } from './ocr-assets'
@@ -23,8 +29,11 @@ let startupPaths: string[] = collectFileArgs(process.argv.slice(1))
 
 app.on('open-file', (event, path) => {
   event.preventDefault()
-  if (app.isReady() && activeWindow()) void sendOpenPaths([path])
-  else startupPaths.push(path)
+  const win = app.isReady() ? activeWindow() : null
+  if (win) {
+    showAndFocus(win)
+    void sendOpenPaths([path], win)
+  } else startupPaths.push(path)
 })
 
 const gotLock = app.requestSingleInstanceLock()
@@ -35,10 +44,11 @@ if (!gotLock) {
     const files = collectFileArgs(argv.slice(1))
     const win = activeWindow()
     if (win) {
-      if (win.isMinimized()) win.restore()
-      win.focus()
+      showAndFocus(win)
       void sendOpenPaths(files, win)
     } else {
+      // Okuyucu penceresi kalmadıysa (ör. kullanıcı kapattı, gizli render penceresi
+      // süreci ayakta tutuyordu) YENİ pencere aç — dosya boşluğa gitmesin.
       createWindow(files)
     }
   })

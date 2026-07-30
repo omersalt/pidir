@@ -96,3 +96,16 @@ export function markupToPdf(html: string, fitPageHeightPx?: number): Promise<Uin
   chain = job.catch(() => undefined)
   return job
 }
+
+/** Gizli render penceresini yok eder. Son okuyucu penceresi kapanınca çağrılır —
+ * yoksa bu gizli pencere `window-all-closed`'ı engelleyip süreci zombi bırakır
+ * (tek-instance kilidi asılı kalır, sonraki açışlar boşa gider). */
+export function closeRenderWindow(): void {
+  if (renderWin && !renderWin.isDestroyed()) renderWin.destroy()
+  renderWin = null
+}
+
+/** Bir pencere bizim gizli render penceremiz mi? activeWindow() onu ASLA seçmemeli. */
+export function isRenderWindow(win: Electron.BrowserWindow): boolean {
+  return win === renderWin
+}

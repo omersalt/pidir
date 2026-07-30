@@ -3,6 +3,11 @@ import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
 import { FALLBACK_BG } from './theme'
 import { readFiles } from './file-intake'
+import { closeRenderWindow } from './markup'
+
+// Yalnız OKUYUCU pencereleri (createWindow ile açılan). markupToPdf'in gizli render
+// penceresi buraya GİRMEZ → activeWindow onu seçmez, dosya ona yanlışlıkla gitmez.
+const readerWindows = new Set<BrowserWindow>()
 
 // Çoklu pencere: her Pidır penceresi bağımsızdır. Pencere-başına durum (PiP,
 // renderer hazır mı, bekleyen dosyalar) WeakMap'te tutulur; işlemler ya gönderen
@@ -23,9 +28,36 @@ function st(win: BrowserWindow): WinState {
   return s
 }
 
-/** Menü hızlandırıcıları / diyaloglar için etkin (odaktaki) pencere. */
+/** Menü hızlandırıcıları / diyaloglar için etkin (okuyucu) pencere. Gizli render
+ * penceresi ASLA dönmez — yoksa açılan dosya ona gidip ekranda hiçbir şey görünmez. */
 export function activeWindow(): BrowserWindow | null {
-  return BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0] ?? null
+  const focused = BrowserWindow.getFocusedWindow()
+  if (focused && readerWindows.has(focused)) return focused
+  for (const w of readerWindows) if (!w.isDestroyed()) return w
+  return null
+}
+
+/** Açık okuyucu penceresi sayısı (gizli render penceresi hariç). */
+export function readerWindowCount(): number {
+  return readerWindows.size
+}
+
+/** Pencereyi güvenilir biçimde göster + öne getir. Windows foreground-lock'ta salt
+ * `focus()` çoğu zaman pencereyi yükseltmez → kısa alwaysOnTop hilesiyle zorla öne al.
+ * PiP modundaki pencerede zaten alwaysOnTop açık, dokunma. */
+export function showAndFocus(win: BrowserWindow): void {
+  if (win.isDestroyed()) return
+  if (win.isMinimized()) win.restore()
+  if (!win.isVisible()) win.show()
+  if (st(win).pipBounds === null) {
+    win.setAlwaysOnTop(true)
+    win.show()
+    win.focus()
+    win.setAlwaysOnTop(false)
+  } else {
+    win.focus()
+  }
+  win.moveTop()
 }
 // Geriye dönük uyum: eski çağrılar odaktaki pencereyi alır.
 export function getMainWindow(): BrowserWindow | null {
@@ -174,6 +206,7 @@ export function createWindow(openPaths: string[] = []): BrowserWindow {
     }
   })
 
+  readerWindows.add(win)
   if (openPaths.length) st(win).pending.push(...openPaths)
 
   // Oranı kilitle: belge yüklense de kendiliğinden bozulmaz; kullanıcı elle
@@ -181,7 +214,13 @@ export function createWindow(openPaths: string[] = []): BrowserWindow {
   win.setAspectRatio(ASPECT)
 
   win.on('ready-to-show', () => win.show())
-  win.on('closed', () => stateMap.delete(win))
+  win.on('closed', () => {
+    stateMap.delete(win)
+    readerWindows.delete(win)
+    // Son okuyucu penceresi kapandıysa gizli render penceresini de kapat →
+    // window-all-closed tetiklenir, süreç zombi kalmaz (tek-instance kilidi çözülür).
+    if (readerWindows.size === 0) closeRenderWindow()
+  })
 
   win.webContents.setWindowOpenHandler((details) => {
     // Only hand genuine web/mail links to the OS; never blindly open arbitrary
