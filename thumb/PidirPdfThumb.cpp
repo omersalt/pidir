@@ -133,6 +133,38 @@ static HRESULT ConvertDocxToPdf(const std::vector<BYTE>& docx, std::vector<BYTE>
     return S_OK;
 }
 
+// MARKDOWN (.md) baytlarini PDF baytlarina cevirir (Pidir'in pidir_md.py hatti).
+// docx yolunun ikizi: icerik hash'iyle cache, ayni .md bir daha Python calistirmaz.
+// .md'nin sihirli bayti olmadigi icin bu dal "PDF de degil ZIP de degil" durumunda
+// (yani .md\ShellEx ile gelen dosyalarda) calisir.
+static HRESULT ConvertMdToPdf(const std::vector<BYTE>& md, std::vector<BYTE>& outPdf) {
+    std::wstring dir = LocalPidirDir();
+    if (dir.empty()) return E_FAIL;
+    std::wstring cacheDir = dir + L"\\mdcache";
+    SHCreateDirectoryExW(nullptr, cacheDir.c_str(), nullptr);
+
+    wchar_t key[80];
+    swprintf_s(key, L"%016llx_%zu", (unsigned long long)Fnv1a(md), md.size());
+    std::wstring cachePdf = cacheDir + L"\\" + key + L".pdf";
+
+    if (ReadFileBytes(cachePdf, outPdf) && outPdf.size() > 800) return S_OK;
+
+    std::wstring py = GetRegStr(L"Software\\Pidir\\Thumb", L"PythonExe");
+    std::wstring script = GetRegStr(L"Software\\Pidir\\Thumb", L"MdScript");
+    if (py.empty() || script.empty()) return E_FAIL;
+
+    std::wstring tmpMd = cacheDir + L"\\" + key + L".md";
+    if (!WriteFileBytes(tmpMd, md)) return E_FAIL;
+
+    std::wstring cmd = L"\"" + py + L"\" -X utf8 \"" + script + L"\" \"" + tmpMd + L"\" \"" + cachePdf + L"\"";
+    bool ok = RunProcess(cmd, 30000);
+    DeleteFileW(tmpMd.c_str());
+    if (!ok) { DeleteFileW(cachePdf.c_str()); return E_FAIL; }
+
+    if (!ReadFileBytes(cachePdf, outPdf) || outPdf.size() < 800) return E_FAIL;
+    return S_OK;
+}
+
 // ============================ Render cekirdegi ================================
 // Bellekteki PDF baytlarindan ilk sayfayi 'cx' sinir kutusuna render eder,
 // 32bpp PBGRA HBITMAP dondurur. Ayri MTA thread'inde cagrilir.
@@ -270,9 +302,12 @@ public:
         const std::vector<BYTE>* pdf = &m_bytes;
         std::vector<BYTE> converted;
         if (!isPdf) {
-            if (!isZip) return E_FAIL;
-            // docx -> pdf (cache'li Python hatti); render'dan ONCE, WinRT'siz
-            if (FAILED(ConvertDocxToPdf(m_bytes, converted)) || converted.empty()) return E_FAIL;
+            // ZIP (PK) -> docx; digeri (duz metin) -> markdown. Ikisi de cache'li
+            // Python hatti; render'dan ONCE, WinRT'siz. .md/.docx yalniz kendi
+            // ShellEx kaydiyla geldigi icin yanlis dala dusmez.
+            HRESULT chr = isZip ? ConvertDocxToPdf(m_bytes, converted)
+                                : ConvertMdToPdf(m_bytes, converted);
+            if (FAILED(chr) || converted.empty()) return E_FAIL;
             pdf = &converted;
         }
 
@@ -374,8 +409,8 @@ STDAPI DllRegisterServer() {
     SetKey(root, kInproc.c_str(), path);
     SetNamed(root, kInproc.c_str(), L"ThreadingModel", L"Apartment");
 
-    // .pdf ve .docx uzantilarina thumbnail handler bagla (uzanti seviyesi)
-    for (const wchar_t* ext : { L".pdf", L".docx" }) {
+    // .pdf, .docx, .md, .markdown uzantilarina thumbnail handler bagla (uzanti seviyesi)
+    for (const wchar_t* ext : { L".pdf", L".docx", L".md", L".markdown" }) {
         std::wstring kShellEx = std::wstring(L"Software\\Classes\\") + ext +
                                 L"\\ShellEx\\" + std::wstring(kThumbHandlerGuid);
         SetKey(root, kShellEx.c_str(), clsid.c_str());
@@ -386,7 +421,7 @@ STDAPI DllRegisterServer() {
 STDAPI DllUnregisterServer() {
     std::wstring clsid = ClsidStr();
     for (HKEY root : { HKEY_LOCAL_MACHINE, HKEY_CURRENT_USER }) {
-        for (const wchar_t* ext : { L".pdf", L".docx" }) {
+        for (const wchar_t* ext : { L".pdf", L".docx", L".md", L".markdown" }) {
             std::wstring kShellEx = std::wstring(L"Software\\Classes\\") + ext +
                                     L"\\ShellEx\\" + std::wstring(kThumbHandlerGuid);
             RegDeleteTreeW(root, kShellEx.c_str());

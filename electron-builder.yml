@@ -60,6 +60,14 @@ fileAssociations:
     name: JSON Belgesi
     description: JSON Belgesi
     role: Viewer
+  - ext: md
+    name: Markdown Belgesi
+    description: Markdown Belgesi
+    role: Viewer
+  - ext: markdown
+    name: Markdown Belgesi
+    description: Markdown Belgesi
+    role: Viewer
 win:
   executableName: pidir
   # NSIS kurulum, portable'ın YERİNE geçti. Portable hedefi her çalıştırmada 98 MB'lık

@@ -18,6 +18,7 @@ import {
   setCaptionSymbols
 } from './window'
 import { runSidecar, SidecarRequest } from './sidecar'
+import { openInEditor, isMarkdown } from './md'
 import { olayYaz } from './telemetri'
 import { guncellemeDurumu } from './guncelleyici'
 
@@ -47,6 +48,18 @@ export function registerIpc(): void {
   )
 
   ipcMain.handle('pdfx:renderer-ready', (e) => markReady(senderWin(e)))
+
+  // Kaynağı dış editörde aç (Ctrl+E). YALNIZ .md/.markdown yollarını kabul eder —
+  // PİDİR .md'yi kendi düzenlemez; düzenleme her zaman Sublime/Notepad'de yapılır.
+  // Yol kısıtı bir güvenlik kapısıdır: renderer buradan keyfi exe çalıştıramaz.
+  ipcMain.handle('pdfx:open-in-editor', (_event, path: unknown) => {
+    if (typeof path !== 'string' || !path || path.includes('\0') || !isAbsolute(path)) {
+      return { ok: false, editor: '' }
+    }
+    if (!isMarkdown(path)) return { ok: false, editor: '' }
+    olayYaz('ozellik', { ad: 'md_edit' })
+    return openInEditor(path)
+  })
 
   // Arayüzün hangi özelliğin kullanıldığını bildirmesi için tek uç. Girdi serbest metin
   // olduğundan telemetri modülü kendi içinde kırpıyor; burada yalnız tür kontrolü yapılır.
@@ -135,9 +148,13 @@ export function registerIpc(): void {
       title: 'Belge Aç',
       properties: ['openFile', 'multiSelections'],
       filters: [
-        { name: 'Belgeler', extensions: ['pdf', 'docx', 'csv', 'tsv', 'json', 'jsonl', 'ndjson'] },
+        {
+          name: 'Belgeler',
+          extensions: ['pdf', 'docx', 'csv', 'tsv', 'json', 'jsonl', 'ndjson', 'md', 'markdown']
+        },
         { name: 'PDF', extensions: ['pdf'] },
         { name: 'Word Belgesi', extensions: ['docx'] },
+        { name: 'Markdown', extensions: ['md', 'markdown', 'mdown', 'mkd'] },
         { name: 'Tablo (CSV)', extensions: ['csv', 'tsv'] },
         { name: 'JSON', extensions: ['json', 'jsonl', 'ndjson'] },
         { name: 'Tüm Dosyalar', extensions: ['*'] }

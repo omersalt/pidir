@@ -201,6 +201,18 @@ export default function App(): React.JSX.Element {
     void window.api.pipToggle()
   }, [])
 
+  // Açık belge bir markdown kaynağından mı geldi? (Ad .pdf'e döner, ama docApi.path
+  // ORİJİNAL .md yolunu tutar.) Öyleyse Ctrl+E ile Sublime'da düzenlenebilir.
+  const mdSource = useMemo(
+    () => (/\.(md|markdown|mdown|mkd)$/i.test(docApi.path || '') ? docApi.path : null),
+    [docApi.path]
+  )
+  const editSource = useCallback(async () => {
+    if (!mdSource) return
+    const res = await window.api.openInEditor(mdSource)
+    flash(res.ok ? `${res.editor}'da açıldı` : 'Editör açılamadı')
+  }, [mdSource, flash])
+
   const scrollToPage = useCallback(
     (n: number) => {
       const el = scrollerRef.current
@@ -273,6 +285,14 @@ export default function App(): React.JSX.Element {
         e.preventDefault()
         find.openFind()
         break
+      case 'e':
+      case 'E':
+        // Yalnız markdown belgelerinde: kaynağı Sublime/Notepad'de aç (PİDİR yazmaz).
+        if (mdSource) {
+          e.preventDefault()
+          void editSource()
+        }
+        break
       case '=':
       case '+':
         e.preventDefault()
@@ -318,6 +338,16 @@ export default function App(): React.JSX.Element {
       { label: 'Sayfalar…', disabled: !hasDoc, onClick: () => setPagesOpen(true) },
       { label: 'Bu Sayfayı Döndür', disabled: !hasDoc, onClick: () => void rotateCurrent() },
       { label: 'Sadeleştir (üst/alt bilgi)', disabled: !hasDoc, onClick: () => void simplify() },
+      ...(mdSource
+        ? [
+            { label: '', separator: true },
+            {
+              label: 'Kaynağı Düzenle (Sublime)',
+              shortcut: acc('Ctrl+E'),
+              onClick: () => void editSource()
+            }
+          ]
+        : []),
       { label: '', separator: true },
       {
         label: pip ? 'PiP Modundan Çık' : 'PiP Modu',
@@ -326,7 +356,7 @@ export default function App(): React.JSX.Element {
         onClick: togglePip
       }
     ]
-  }, [doc, docApi, saveAs, view, find, rotateCurrent, simplify, pip, togglePip])
+  }, [doc, docApi, saveAs, view, find, rotateCurrent, simplify, pip, togglePip, mdSource, editSource])
 
   return (
     <FindProvider value={findState}>

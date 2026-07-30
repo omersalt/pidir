@@ -45,6 +45,9 @@ const api = {
   writeFile: (path: string, data: Uint8Array): Promise<string> =>
     ipcRenderer.invoke('pdfx:write-file', path, data),
   openFiles: (): Promise<OpenedFile[]> => ipcRenderer.invoke('pdfx:open-files'),
+  /** .md kaynağını dış editörde (Sublime/Notepad) açar. Yalnız markdown yolları geçer. */
+  openInEditor: (path: string): Promise<{ ok: boolean; editor: string }> =>
+    ipcRenderer.invoke('pdfx:open-in-editor', path),
   newWindow: (): Promise<void> => ipcRenderer.invoke('pdfx:new-window'),
   captionSymbols: (visible: boolean): Promise<void> =>
     ipcRenderer.invoke('pdfx:caption-symbols', visible),

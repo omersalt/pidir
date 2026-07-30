@@ -3,6 +3,7 @@ import { existsSync } from 'fs'
 import { readFile, readdir, stat } from 'fs/promises'
 import { docxToPdf, isDocx } from './docx'
 import { csvToPdf, isCsv, isJson, jsonToPdf } from './tablo'
+import { isMarkdown, mdToPdf } from './md'
 import { olayYaz } from './telemetri'
 
 export interface OpenedFile {
@@ -12,11 +13,13 @@ export interface OpenedFile {
 }
 
 export const IMPORTABLE =
-  /\.(pdf|pdfx|docx|csv|tsv|json|jsonl|ndjson|png|jpe?g|webp|gif|bmp|avif|txt|rtf|svg|html?)$/i
+  /\.(pdf|pdfx|docx|csv|tsv|json|jsonl|ndjson|md|markdown|mdown|mkd|png|jpe?g|webp|gif|bmp|avif|txt|rtf|svg|html?)$/i
 
 export function collectFileArgs(argv: string[]): string[] {
   return argv.filter(
-    (arg) => /\.(pdf|pdfx|docx|csv|tsv|json|jsonl|ndjson)$/i.test(arg) && existsSync(arg)
+    (arg) =>
+      /\.(pdf|pdfx|docx|csv|tsv|json|jsonl|ndjson|md|markdown|mdown|mkd)$/i.test(arg) &&
+      existsSync(arg)
   )
 }
 
@@ -44,6 +47,13 @@ export async function readFiles(paths: string[]): Promise<OpenedFile[]> {
       if (isJson(p)) {
         const pdf = await jsonToPdf(data, basename(p))
         olayYaz('belge_acildi', { tur: 'json', boyutKb })
+        return { name: pdfAdi(p), data: pdf, path: p }
+      }
+      if (isMarkdown(p)) {
+        // .md → GitHub tarzı render PDF. path: p ORİJİNAL .md yolunu taşır (Ctrl+E
+        // ile Sublime'da açmak için); okuyucu bunu asla düzenlemez/üzerine yazmaz.
+        const pdf = await mdToPdf(data, basename(p))
+        olayYaz('belge_acildi', { tur: 'md', boyutKb })
         return { name: pdfAdi(p), data: pdf, path: p }
       }
       olayYaz('belge_acildi', { tur: 'pdf', boyutKb })
