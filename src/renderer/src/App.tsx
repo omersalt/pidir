@@ -204,7 +204,7 @@ export default function App(): React.JSX.Element {
   // Açık belge bir markdown kaynağından mı geldi? (Ad .pdf'e döner, ama docApi.path
   // ORİJİNAL .md yolunu tutar.) Öyleyse Ctrl+E ile Sublime'da düzenlenebilir.
   const mdSource = useMemo(
-    () => (/\.(md|markdown|mdown|mkd)$/i.test(docApi.path || '') ? docApi.path : null),
+    () => (/\.(md|markdown|mdown|mkd|txt|text|log)$/i.test(docApi.path || '') ? docApi.path : null),
     [docApi.path]
   )
   const editSource = useCallback(async () => {

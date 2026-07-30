@@ -7,6 +7,7 @@ import { buildMenu } from './menu'
 import { registerIpc } from './register-ipc'
 import { registerOcrProtocol, registerOcrSchemePrivileged } from './ocr-assets'
 import { guncellemeyiBaslat } from './guncelleyici'
+import { associationlariOnar } from './associations'
 import { telemetriBaslat, telemetriKapat } from './telemetri'
 
 app.setName('Pidır')
@@ -61,6 +62,11 @@ if (!gotLock) {
     // Güncelleme kontrolü kendi içinde 10 sn geciktirilir ve electron-updater'ı ancak
     // o zaman yükler — pencere çizimi bu satırdan etkilenmez.
     guncellemeyiBaslat()
+
+    // Dosya ilişkilendirme komutlarını (boşluklu kurulum yolunda electron-builder
+    // TIRNAKSIZ yazar → çift-tık kırılır) açılışta tırnakla onar. Deferred + ateşle-unut:
+    // pencere çizimini bloklamaz, yalnız gerekirse yazar.
+    setTimeout(() => void associationlariOnar().catch(() => {}), 3000)
 
     nativeTheme.on('updated', () => {
       const bg = nativeTheme.shouldUseDarkColors ? FALLBACK_BG.dark : FALLBACK_BG.light

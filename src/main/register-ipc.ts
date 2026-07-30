@@ -18,7 +18,7 @@ import {
   setCaptionSymbols
 } from './window'
 import { runSidecar, SidecarRequest } from './sidecar'
-import { openInEditor, isMarkdown } from './md'
+import { openInEditor, isMarkdown, isText } from './md'
 import { olayYaz } from './telemetri'
 import { guncellemeDurumu } from './guncelleyici'
 
@@ -56,7 +56,7 @@ export function registerIpc(): void {
     if (typeof path !== 'string' || !path || path.includes('\0') || !isAbsolute(path)) {
       return { ok: false, editor: '' }
     }
-    if (!isMarkdown(path)) return { ok: false, editor: '' }
+    if (!isMarkdown(path) && !isText(path)) return { ok: false, editor: '' }
     olayYaz('ozellik', { ad: 'md_edit' })
     return openInEditor(path)
   })
@@ -150,11 +150,15 @@ export function registerIpc(): void {
       filters: [
         {
           name: 'Belgeler',
-          extensions: ['pdf', 'docx', 'csv', 'tsv', 'json', 'jsonl', 'ndjson', 'md', 'markdown']
+          extensions: [
+            'pdf', 'docx', 'csv', 'tsv', 'json', 'jsonl', 'ndjson',
+            'md', 'markdown', 'txt', 'text', 'log'
+          ]
         },
         { name: 'PDF', extensions: ['pdf'] },
         { name: 'Word Belgesi', extensions: ['docx'] },
         { name: 'Markdown', extensions: ['md', 'markdown', 'mdown', 'mkd'] },
+        { name: 'Metin', extensions: ['txt', 'text', 'log'] },
         { name: 'Tablo (CSV)', extensions: ['csv', 'tsv'] },
         { name: 'JSON', extensions: ['json', 'jsonl', 'ndjson'] },
         { name: 'Tüm Dosyalar', extensions: ['*'] }

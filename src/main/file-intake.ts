@@ -3,7 +3,7 @@ import { existsSync } from 'fs'
 import { readFile, readdir, stat } from 'fs/promises'
 import { docxToPdf, isDocx } from './docx'
 import { csvToPdf, isCsv, isJson, jsonToPdf } from './tablo'
-import { isMarkdown, mdToPdf } from './md'
+import { isMarkdown, mdToPdf, isText, txtToPdf } from './md'
 import { olayYaz } from './telemetri'
 
 export interface OpenedFile {
@@ -18,7 +18,7 @@ export const IMPORTABLE =
 export function collectFileArgs(argv: string[]): string[] {
   return argv.filter(
     (arg) =>
-      /\.(pdf|pdfx|docx|csv|tsv|json|jsonl|ndjson|md|markdown|mdown|mkd)$/i.test(arg) &&
+      /\.(pdf|pdfx|docx|csv|tsv|json|jsonl|ndjson|md|markdown|mdown|mkd|txt|text|log)$/i.test(arg) &&
       existsSync(arg)
   )
 }
@@ -54,6 +54,13 @@ export async function readFiles(paths: string[]): Promise<OpenedFile[]> {
         // ile Sublime'da açmak için); okuyucu bunu asla düzenlemez/üzerine yazmaz.
         const pdf = await mdToPdf(data, basename(p))
         olayYaz('belge_acildi', { tur: 'md', boyutKb })
+        return { name: pdfAdi(p), data: pdf, path: p }
+      }
+      if (isText(p)) {
+        // .txt → düz metin (satır sonları korunur), tema-duyarlı. Kaynağa dokunmaz;
+        // path: p ile Ctrl+E dış editörde açar.
+        const pdf = await txtToPdf(data, basename(p))
+        olayYaz('belge_acildi', { tur: 'txt', boyutKb })
         return { name: pdfAdi(p), data: pdf, path: p }
       }
       olayYaz('belge_acildi', { tur: 'pdf', boyutKb })

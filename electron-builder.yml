@@ -68,6 +68,10 @@ fileAssociations:
     name: Markdown Belgesi
     description: Markdown Belgesi
     role: Viewer
+  - ext: txt
+    name: Metin Belgesi
+    description: Metin Belgesi
+    role: Viewer
 win:
   executableName: pidir
   # NSIS kurulum, portable'ın YERİNE geçti. Portable hedefi her çalıştırmada 98 MB'lık

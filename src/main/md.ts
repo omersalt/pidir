@@ -1,6 +1,7 @@
 import { basename, extname } from 'path'
 import { existsSync } from 'fs'
 import { spawn } from 'child_process'
+import { nativeTheme } from 'electron'
 import { marked } from 'marked'
 import { markupToPdf } from './markup'
 
@@ -9,48 +10,70 @@ export function isMarkdown(p: string): boolean {
   return /\.(md|markdown|mdown|mkd)$/i.test(p)
 }
 
-// GitHub README estetiği, tek dosyalık (harici kaynak yok — markup.ts'in CSP'si
-// default-src 'none'; img data:; style-src 'unsafe-inline' data: kuralını dayatır).
+// GitHub README estetiği, açık + koyu palet. Tek dosyalık (harici kaynak yok —
+// markup.ts'in CSP'si default-src 'none'; img data:; style-src 'unsafe-inline' data:
+// dayatır). Koyu palet Windows gece modunda seçilir → PDF zemini o an gömülür.
+interface Palet {
+  bg: string; fg: string; kenar: string; link: string; sessiz: string
+  kodBg: string; preBg: string; thBg: string; ciftBg: string
+}
+const ACIK: Palet = {
+  bg: '#ffffff', fg: '#1f2328', kenar: '#d1d9e0', link: '#0969da', sessiz: '#59636e',
+  kodBg: '#eff1f3', preBg: '#f6f8fa', thBg: '#f6f8fa', ciftBg: '#f6f8fa'
+}
+const KOYU: Palet = {
+  bg: '#0d1117', fg: '#e6edf3', kenar: '#30363d', link: '#4493f8', sessiz: '#9198a1',
+  kodBg: '#656c7633', preBg: '#161b22', thBg: '#161b22', ciftBg: '#151b23'
+}
+
 // A4 sayfa + doğal sayfalama (preferCSSPageSize markup.ts'te açık).
-const GITHUB_CSS = `
+function githubCss(p: Palet): string {
+  return `
 @page { size: A4; margin: 16mm 15mm; }
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
 body {
   font: 15px/1.6 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  color: #1f2328; background: #fff;
+  color: ${p.fg}; background: ${p.bg};
   -webkit-print-color-adjust: exact; print-color-adjust: exact;
   word-wrap: break-word;
 }
 h1, h2, h3, h4, h5, h6 { margin: 24px 0 16px; font-weight: 600; line-height: 1.25; }
-h1 { font-size: 2em; padding-bottom: .3em; border-bottom: 1px solid #d1d9e0; }
-h2 { font-size: 1.5em; padding-bottom: .3em; border-bottom: 1px solid #d1d9e0; }
-h3 { font-size: 1.25em; } h4 { font-size: 1em; } h5 { font-size: .875em; } h6 { font-size: .85em; color: #59636e; }
+h1 { font-size: 2em; padding-bottom: .3em; border-bottom: 1px solid ${p.kenar}; }
+h2 { font-size: 1.5em; padding-bottom: .3em; border-bottom: 1px solid ${p.kenar}; }
+h3 { font-size: 1.25em; } h4 { font-size: 1em; } h5 { font-size: .875em; } h6 { font-size: .85em; color: ${p.sessiz}; }
 p, blockquote, ul, ol, dl, table, pre { margin: 0 0 16px; }
-a { color: #0969da; text-decoration: none; } a:hover { text-decoration: underline; }
+a { color: ${p.link}; text-decoration: none; } a:hover { text-decoration: underline; }
 strong { font-weight: 600; }
 ul, ol { padding-left: 2em; }
 li + li { margin-top: .25em; }
 li.task-list-item { list-style: none; }
 li.task-list-item input { margin: 0 .4em .15em -1.4em; vertical-align: middle; }
-blockquote { padding: 0 1em; color: #59636e; border-left: .25em solid #d1d9e0; }
+blockquote { padding: 0 1em; color: ${p.sessiz}; border-left: .25em solid ${p.kenar}; }
 code {
   font: .85em/1.45 ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", monospace;
-  background: #eff1f3; padding: .2em .4em; border-radius: 6px;
+  background: ${p.kodBg}; padding: .2em .4em; border-radius: 6px;
 }
 pre {
-  background: #f6f8fa; padding: 14px 16px; border-radius: 8px; overflow: auto;
+  background: ${p.preBg}; padding: 14px 16px; border-radius: 8px; overflow: auto;
   font-size: .85em; line-height: 1.45;
 }
 pre code { background: none; padding: 0; font-size: 100%; white-space: pre; }
 table { border-collapse: collapse; display: block; width: max-content; max-width: 100%; overflow: auto; }
-table th, table td { padding: 6px 13px; border: 1px solid #d1d9e0; }
-table th { font-weight: 600; background: #f6f8fa; }
-table tr:nth-child(2n) { background: #f6f8fa; }
+table th, table td { padding: 6px 13px; border: 1px solid ${p.kenar}; }
+table th { font-weight: 600; background: ${p.thBg}; }
+table tr:nth-child(2n) { background: ${p.ciftBg}; }
 img { max-width: 100%; }
-hr { height: .25em; margin: 24px 0; background: #d1d9e0; border: 0; }
+hr { height: .25em; margin: 24px 0; background: ${p.kenar}; border: 0; }
 h1:first-child, h2:first-child, h3:first-child { margin-top: 0; }
 `
+}
+
+// Sistem temasına göre palet seç (Windows gece modu → koyu). themeSource varsayılan
+// 'system' olduğu için shouldUseDarkColors OS'u yansıtır.
+function paletSec(): Palet {
+  return nativeTheme.shouldUseDarkColors ? KOYU : ACIK
+}
 
 // GitHub Flavored Markdown, satır sonu = <br> DEĞİL (README davranışı).
 marked.setOptions({ gfm: true, breaks: false })
@@ -67,9 +90,39 @@ export async function mdToPdf(data: Uint8Array, name: string): Promise<Uint8Arra
   const title = basename(name).replace(/\.[^.]+$/, '')
   const html =
     '<!doctype html><html lang="tr"><head><meta charset="utf-8">' +
-    `<title>${escapeHtml(title)}</title><style>${GITHUB_CSS}</style></head>` +
+    `<title>${escapeHtml(title)}</title><style>${githubCss(paletSec())}</style></head>` +
     `<body class="markdown-body">${bodyHtml}</body></html>`
   // fitPageHeightPx VERİLMEZ → doğal çok-sayfalı A4 (CSV'deki tek-sayfa sığdırma değil).
+  return markupToPdf(html)
+}
+
+/** .txt uzantısı. */
+export function isText(p: string): boolean {
+  return /\.(txt|text|log)$/i.test(p)
+}
+
+/** .txt baytlarını DÜZ METİN olarak (satır sonları korunur, monospace) PDF'e çevirir.
+ * Markdown parse EDİLMEZ — .txt'te tek satır sonları anlamlıdır (log/not). Tema-duyarlı. */
+export async function txtToPdf(data: Uint8Array, name: string): Promise<Uint8Array> {
+  const p = paletSec()
+  const metin = escapeHtml(utf8(data))
+  const title = basename(name).replace(/\.[^.]+$/, '')
+  const css = `
+@page { size: A4; margin: 16mm 15mm; }
+html, body { margin: 0; padding: 0; }
+body {
+  color: ${p.fg}; background: ${p.bg};
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+pre {
+  margin: 0;
+  font: 12px/1.5 ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", monospace;
+  white-space: pre-wrap; word-wrap: break-word; overflow-wrap: anywhere;
+}`
+  const html =
+    '<!doctype html><html lang="tr"><head><meta charset="utf-8">' +
+    `<title>${escapeHtml(title)}</title><style>${css}</style></head>` +
+    `<body><pre>${metin}</pre></body></html>`
   return markupToPdf(html)
 }
 

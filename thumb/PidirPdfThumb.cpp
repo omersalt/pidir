@@ -410,7 +410,7 @@ STDAPI DllRegisterServer() {
     SetNamed(root, kInproc.c_str(), L"ThreadingModel", L"Apartment");
 
     // .pdf, .docx, .md, .markdown uzantilarina thumbnail handler bagla (uzanti seviyesi)
-    for (const wchar_t* ext : { L".pdf", L".docx", L".md", L".markdown" }) {
+    for (const wchar_t* ext : { L".pdf", L".docx", L".md", L".markdown", L".txt" }) {
         std::wstring kShellEx = std::wstring(L"Software\\Classes\\") + ext +
                                 L"\\ShellEx\\" + std::wstring(kThumbHandlerGuid);
         SetKey(root, kShellEx.c_str(), clsid.c_str());
@@ -421,7 +421,7 @@ STDAPI DllRegisterServer() {
 STDAPI DllUnregisterServer() {
     std::wstring clsid = ClsidStr();
     for (HKEY root : { HKEY_LOCAL_MACHINE, HKEY_CURRENT_USER }) {
-        for (const wchar_t* ext : { L".pdf", L".docx", L".md", L".markdown" }) {
+        for (const wchar_t* ext : { L".pdf", L".docx", L".md", L".markdown", L".txt" }) {
             std::wstring kShellEx = std::wstring(L"Software\\Classes\\") + ext +
                                     L"\\ShellEx\\" + std::wstring(kThumbHandlerGuid);
             RegDeleteTreeW(root, kShellEx.c_str());
