@@ -14,6 +14,18 @@ interface TopBarProps {
   onFitWidth: () => void
   onFind: () => void
   onMenu: (x: number, y: number) => void
+  /** Dikey kilit (9:16): açıkken her belge 21:30 pencerede; kapalıyken pencere belgeye uyar. */
+  dikeyKilit: boolean
+  onDikeyKilit: () => void
+}
+
+function DikeyKilitIcon({ on }: { on: boolean }): React.JSX.Element {
+  // Dikey sayfa dikdörtgeni; kilit açıkken dolu, kapalıyken yalnız çerçeve.
+  return (
+    <svg width={16} height={16} viewBox="0 0 24 24" fill={on ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <rect x="7" y="3" width="10" height="18" rx="1.5" />
+    </svg>
+  )
 }
 
 // 100% = gerçek boyut (PDF puanı 96 dpi'da 96/72 CSS px'e denk gelir).
@@ -55,7 +67,9 @@ export function TopBar({
   onZoomOut,
   onFitWidth,
   onFind,
-  onMenu
+  onMenu,
+  dikeyKilit,
+  onDikeyKilit
 }: TopBarProps): React.JSX.Element {
   return (
     <div className={'topbar' + (mac ? ' mac' : '') + (win ? ' win' : '') + (show ? ' show' : '')}>
@@ -78,6 +92,18 @@ export function TopBar({
         </button>
         <button className="icon-btn" title="Genişliğe sığdır" onClick={onFitWidth}>
           <FitWidthIcon />
+        </button>
+        <button
+          className={'icon-btn' + (dikeyKilit ? ' on' : '')}
+          title={
+            dikeyKilit
+              ? 'Dikey kilit AÇIK: her belge 9:16 pencerede. Kapatınca pencere belgenin oranına uyar.'
+              : 'Dikey kilit KAPALI: pencere belgenin oranına uyar. Açınca her belge 9:16 pencereye zorlanır.'
+          }
+          aria-pressed={dikeyKilit}
+          onClick={onDikeyKilit}
+        >
+          <DikeyKilitIcon on={dikeyKilit} />
         </button>
         <button className="icon-btn" title="Ara (Ctrl+F)" onClick={onFind}>
           <SearchIcon size={15} />

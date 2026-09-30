@@ -18,15 +18,127 @@ interface WinState {
   pipWasMax: boolean
   pending: string[]
   reveal: (() => void) | null
+  /** Pencerenin istenen en/boy oranı (genişlik/yükseklik). Belge açılınca renderer
+   *  belgenin sayfa oranını gönderir; dikey kilit açıksa hep 21:30. Tam ekran ve PiP
+   *  bu değeri bozmaz, çıkışta geri gelir. */
+  aspect: number
+  /** Oran değişti ama pencere o an tam ekran / PiP / büyütülmüş olduğu için
+   *  yeniden boyutlanamadı → ilk uygun anda (çıkışta, unmaximize'da) uygulanır. */
+  boyutBekliyor: boolean
+  /** Kullanıcı pencereyi sürüklüyor (will-move … moved). Bu sırada setBounds yapılmaz. */
+  tasiniyor: boolean
 }
 const stateMap = new WeakMap<BrowserWindow, WinState>()
 function st(win: BrowserWindow): WinState {
   let s = stateMap.get(win)
   if (!s) {
-    s = { ready: false, pipBounds: null, pipWasMax: false, pending: [], reveal: null }
+    s = {
+      ready: false,
+      pipBounds: null,
+      pipWasMax: false,
+      pending: [],
+      reveal: null,
+      aspect: ASPECT,
+      boyutBekliyor: false,
+      tasiniyor: false
+    }
     stateMap.set(win, s)
   }
   return s
+}
+
+// Varsayılan pencere oranı: A4 dikey (21:30 = 0.7). Belge açılınca yerini belgenin oranına
+// bırakır; "dikey kilit" açıksa her belge bu orana zorlanır.
+const ASPECT = 21 / 30
+const ORAN_MIN = 0.25 // 1:4'ten dar / 4:1'den yassı pencere anlamsız
+const ORAN_MAX = 4
+// En küçük pencere (createWindow ve PiP kutusu aynı sınırı kullanır).
+const MIN_W = 320
+const MIN_H = 240
+
+/** Pencerenin en/boy oranını belgeye (ya da kilide) göre ayarla. `resize` ile pencere
+ * de o orana getirilir: uzun kenar korunur (dikey→yatay geçişte yükseklik genişlik olur),
+ * çalışma alanına sığdırılır, konumu ekran içinde tutulur. Pencere zaten bu orandaysa
+ * boyutuna ve yerine dokunulmaz. Tam ekran / PiP / büyütülmüş penceredeyken yalnız
+ * kaydedilir (`boyutBekliyor`) ve `bekleyeniUygula` ile ilk uygun anda uygulanır. */
+export function setWindowAspect(win: BrowserWindow | null, ratio: number, resize: boolean): void {
+  const w = win ?? activeWindow()
+  if (!w || w.isDestroyed() || !Number.isFinite(ratio)) return
+  const s = st(w)
+  const b = w.getBounds()
+  const area = screen.getDisplayMatching(b).workArea
+  const maxW = Math.floor(area.width * 0.96)
+  const maxH = Math.floor(area.height * 0.96)
+  // Oranı hem mutlak sınırlara hem de en küçük pencere boyutuyla ÇELİŞMEYECEK aralığa kırp:
+  // aşırı dar belgede (fiş, uzun web sayfası) ekrana sığan yükseklikte genişlik MIN_W'nin
+  // altına düşerdi ve kilit ile alt sınır çatışırdı; aşırı yassıda MIN_H için aynısı.
+  const oran = Math.min(
+    Math.min(ORAN_MAX, maxW / MIN_H),
+    Math.max(Math.max(ORAN_MIN, MIN_W / maxH), ratio)
+  )
+  s.aspect = oran
+  if (s.pipBounds !== null) {
+    // PiP kutusu yeni oranı hemen alsın: kilit de güncellenir (elle boyutlamada eski oran
+    // kalmasın), kutunun SAĞ ALT köşesi yerinde kalır (kullanıcı taşıdıysa zıplamasın).
+    // Ana pencere çıkışta uyar (boyutBekliyor).
+    if (resize) s.boyutBekliyor = true
+    const k = pipKutusu(oran, area)
+    // Kilit kutunun GERÇEK oranına kurulur (uç oranda kutu MIN/%60 sınırlarıyla belge
+    // oranından sapar; kilit belge oranında kalsa elle boyutlamada kutu zıplardı).
+    // PiP çıkışında kilit yine s.aspect'e döner.
+    w.setAspectRatio(k.width / k.height)
+    const x = Math.min(Math.max(b.x + b.width - k.width, area.x), area.x + area.width - k.width)
+    const y = Math.min(Math.max(b.y + b.height - k.height, area.y), area.y + area.height - k.height)
+    w.setBounds({ x, y, width: k.width, height: k.height })
+    return
+  }
+  if (w.isFullScreen()) {
+    if (resize) s.boyutBekliyor = true // leave-full-screen'de uygulanır
+    return
+  }
+  w.setAspectRatio(oran)
+  if (w.isMaximized()) {
+    if (resize) s.boyutBekliyor = true // unmaximize'da uygulanır
+    return
+  }
+  if (!resize) return
+  s.boyutBekliyor = false
+  if (Math.abs(b.width / b.height - oran) / oran < 0.01) return // zaten bu oranda: dokunma
+  const uzun = Math.max(b.width, b.height)
+  let width = oran >= 1 ? uzun : Math.round(uzun * oran)
+  let height = oran >= 1 ? Math.round(uzun / oran) : uzun
+  if (width > maxW) {
+    width = maxW
+    height = Math.round(width / oran)
+  }
+  if (height > maxH) {
+    height = maxH
+    width = Math.round(height * oran)
+  }
+  // Alt sınırın altına düşen kenarı ORANI KORUYARAK büyüt (yalnız o kenarı çekmek
+  // pencereyi kilitten farklı bir biçime sokar, ilk elle boyutlamada zıplardı).
+  // Oran kırpması [MIN_W/maxH, maxW/MIN_H] sayesinde sonuç çalışma alanını aşmaz.
+  if (width < MIN_W) {
+    width = MIN_W
+    height = Math.round(MIN_W / oran)
+  }
+  if (height < MIN_H) {
+    height = MIN_H
+    width = Math.round(MIN_H * oran)
+  }
+  width = Math.max(MIN_W, width) // yuvarlama güvencesi
+  height = Math.max(MIN_H, height)
+  const x = Math.min(Math.max(b.x, area.x), area.x + area.width - width)
+  const y = Math.min(Math.max(b.y, area.y), area.y + area.height - height)
+  w.setBounds({ x, y, width, height })
+}
+
+/** Tam ekran / PiP / büyütme sırasında değişen oranı, pencere serbest kalınca uygula. */
+function bekleyeniUygula(w: BrowserWindow): void {
+  if (w.isDestroyed()) return
+  const s = st(w)
+  if (!s.boyutBekliyor || s.tasiniyor || w.isFullScreen() || s.pipBounds !== null || w.isMaximized()) return
+  setWindowAspect(w, s.aspect, true)
 }
 
 /** Dosya-bekleyen bir pencereyi belge hazır olduğunda göster. renderer
@@ -103,8 +215,35 @@ export async function sendOpenPaths(paths: string[], target?: BrowserWindow | nu
 }
 
 // --- PiP modu (pencere-başına): her zaman üstte, küçük, araçsız pencere ---
+// Kutu pencerenin geçerli oranını izler: dikey belgede 420×600 (21:30), yatay
+// belgede en küçük yükseklik sınırına takılmadan genişler (16:9'da 427×240).
 const PIP_W = 420
-const PIP_H = 600 // 21:30 oranını korur (420 / 0.7)
+function pipKutusu(oran: number, area: Electron.Rectangle): Electron.Rectangle {
+  // Küçük kutu: dikey belgede 420×600 (eski sabit kutu), yatayda 427×240. İki eksende
+  // de sınırlı: yükseklik çalışma alanının %60'ını, genişlik %90'ını aşmaz (dar bir fiş
+  // belgesi kutuyu ekran boyu yapmasın); kısa kenar MIN altına inmez (yoksa Windows onu
+  // kendisi çeker ve kutu görev çubuğunun altına taşar). Uç oranda oran hafif bozulur.
+  const maxW = Math.round(area.width * 0.9)
+  const maxH = Math.round(area.height * 0.6)
+  let h = Math.max(MIN_H, Math.round(PIP_W / oran))
+  let w = Math.max(PIP_W, Math.round(h * oran))
+  if (h > maxH) {
+    h = maxH
+    w = Math.round(h * oran)
+  }
+  if (w > maxW) {
+    w = maxW
+    h = Math.round(w / oran)
+  }
+  w = Math.max(MIN_W, w)
+  h = Math.max(MIN_H, Math.min(maxH, h))
+  return {
+    x: Math.max(area.x, area.x + area.width - w - 24),
+    y: Math.max(area.y, area.y + area.height - h - 24),
+    width: w,
+    height: h
+  }
+}
 
 export function isPip(win?: BrowserWindow | null): boolean {
   const w = win ?? activeWindow()
@@ -118,10 +257,17 @@ export function togglePip(win?: BrowserWindow | null): boolean {
   if (s.pipBounds) {
     w.setAlwaysOnTop(false)
     w.setOpacity(1)
-    if (s.pipWasMax) w.maximize()
-    else w.setBounds(s.pipBounds)
+    const eskiBounds = s.pipBounds
+    const eskiMax = s.pipWasMax
     s.pipWasMax = false
     s.pipBounds = null
+    // Kilit PiP boyunca güncellenmemişti (setWindowAspect PiP'te yalnız kaydeder) →
+    // önce kilidi geçerli orana getir, sonra eski boyuta dön; oran PiP'teyken
+    // değiştiyse (boyutBekliyor) bekleyeniUygula pencereyi yeni orana uydurur.
+    w.setAspectRatio(s.aspect)
+    if (eskiMax) w.maximize()
+    else w.setBounds(eskiBounds)
+    bekleyeniUygula(w)
   } else {
     // Tam ekrandayken PiP'e geçiş: önce tam ekrandan çık, yoksa PiP kutusu tam
     // ekranın üstüne yazılır ve dönüşte tam ekran boyutu "normal" sanılır.
@@ -130,13 +276,9 @@ export function togglePip(win?: BrowserWindow | null): boolean {
     s.pipBounds = s.pipWasMax ? w.getNormalBounds() : w.getBounds()
     if (s.pipWasMax) w.unmaximize()
     w.setAlwaysOnTop(true, 'floating')
-    const area = screen.getDisplayMatching(s.pipBounds).workArea
-    w.setBounds({
-      x: area.x + area.width - PIP_W - 24,
-      y: area.y + area.height - PIP_H - 24,
-      width: PIP_W,
-      height: PIP_H
-    })
+    const kutu = pipKutusu(s.aspect, screen.getDisplayMatching(s.pipBounds).workArea)
+    w.setAspectRatio(kutu.width / kutu.height) // kutunun gerçek oranı; çıkışta s.aspect'e döner
+    w.setBounds(kutu)
   }
   w.webContents.send('pdfx:pip-changed', s.pipBounds !== null)
   return s.pipBounds !== null
@@ -206,8 +348,8 @@ export function setCaptionSymbols(win: BrowserWindow | null, visible: boolean): 
   win.setTitleBarOverlay?.(captionOverlay(visible))
 }
 
-// Açılış penceresi A4 dikey oranında (21:30 = 0.7). Bir PDF sayfası şeklinde.
-const ASPECT = 21 / 30
+// Açılış penceresi A4 dikey oranında (21:30 = 0.7). Bir PDF sayfası şeklinde; belge
+// açılınca renderer belgenin oranını gönderir (setWindowAspect).
 const INIT_H = 1000
 const INIT_W = Math.round(INIT_H * ASPECT) // 700
 
@@ -217,8 +359,10 @@ export function createWindow(openPaths: string[] = []): BrowserWindow {
   const win = new BrowserWindow({
     width: INIT_W,
     height: INIT_H,
-    minWidth: Math.round(500 * ASPECT), // 350 — min. de aynı oranda
-    minHeight: 500,
+    // Alt sınırlar orandan bağımsız: yatay belgede pencere basık, dikeyde dar olabilir;
+    // oran kilidi (setAspectRatio) biçimi zaten korur.
+    minWidth: MIN_W,
+    minHeight: MIN_H,
     show: false,
     autoHideMenuBar: true,
     // Native başlık gizli; düğmeler titleBarOverlay ile (snap layouts için) ama
@@ -254,11 +398,26 @@ export function createWindow(openPaths: string[] = []): BrowserWindow {
     (fs: boolean) =>
     (): void => {
       if (win.isDestroyed()) return
-      win.setAspectRatio(fs ? 0 : ASPECT)
+      win.setAspectRatio(fs ? 0 : st(win).aspect) // çıkışta belgenin/kilidin oranı geri gelir
       win.webContents.send('pdfx:fullscreen-changed', fs)
+      // Tam ekrandayken oran değiştiyse pencere eski boyutuna döndükten SONRA uydur
+      // (Windows'ta olay, bounds geri gelmeden önce gelir → bir tık ertele).
+      if (!fs) setImmediate(() => bekleyeniUygula(win))
     }
   win.on('enter-full-screen', fsUygula(true))
   win.on('leave-full-screen', fsUygula(false))
+  // Büyütülmüşken oran değiştiyse (yalnız kilit kurulmuştu) küçültülünce uygula.
+  // 🪤 Büyütülmüş pencere başlıktan sürüklenerek geri alınırken unmaximize, Windows'un
+  // taşıma döngüsünün İÇİNDE gelir; o anda setBounds pencereyi imlecin altından kaydırır.
+  // will-move … moved arasında bekle, taşıma bitince uygula.
+  win.on('will-move', () => {
+    st(win).tasiniyor = true
+  })
+  win.on('moved', () => {
+    st(win).tasiniyor = false
+    bekleyeniUygula(win)
+  })
+  win.on('unmaximize', () => setTimeout(() => bekleyeniUygula(win), 0))
 
   let revealTimer: ReturnType<typeof setTimeout> | null = null
   const doReveal = (): void => {

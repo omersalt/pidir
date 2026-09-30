@@ -61,6 +61,10 @@ const api = {
   pipToggle: (): Promise<boolean> => ipcRenderer.invoke('pdfx:pip-toggle'),
   pipState: (): Promise<boolean> => ipcRenderer.invoke('pdfx:pip-state'),
   pipOpacity: (value: number): Promise<void> => ipcRenderer.invoke('pdfx:pip-opacity', value),
+  /** Pencere en/boy oranını (genişlik/yükseklik) belgeye ya da dikey kilide göre ayarla;
+   *  resize=true pencereyi de o orana getirir. */
+  setAspect: (ratio: number, resize: boolean): Promise<void> =>
+    ipcRenderer.invoke('pdfx:aspect', ratio, resize),
   /** Tam ekrana gir / çık (F11). Dönüş: yeni durum. */
   fullScreenToggle: (): Promise<boolean> => ipcRenderer.invoke('pdfx:fullscreen-toggle'),
   fullScreenState: (): Promise<boolean> => ipcRenderer.invoke('pdfx:fullscreen-state'),

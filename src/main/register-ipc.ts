@@ -18,7 +18,8 @@ import {
   setCaptionSymbols,
   revealWindow,
   toggleFullScreen,
-  isFullScreen
+  isFullScreen,
+  setWindowAspect
 } from './window'
 import { runSidecar, SidecarRequest } from './sidecar'
 import { openInEditor, isMarkdown, isText } from './md'
@@ -49,6 +50,12 @@ export function registerIpc(): void {
   ipcMain.handle('pdfx:pip-opacity', (e, value: number) => setPipOpacity(Number(value), senderWin(e)))
   ipcMain.handle('pdfx:fullscreen-toggle', (e) => toggleFullScreen(senderWin(e)))
   ipcMain.handle('pdfx:fullscreen-state', (e) => isFullScreen(senderWin(e)))
+  // Pencere oranı (genişlik/yükseklik). Girdi renderer'dan gelir → sayı ve sınır kontrolü.
+  ipcMain.handle('pdfx:aspect', (e, ratio: unknown, resize: unknown) => {
+    const r = Number(ratio)
+    if (!Number.isFinite(r) || r <= 0) return
+    setWindowAspect(senderWin(e), r, resize === true)
+  })
   ipcMain.handle(
     'pdfx:sidecar',
     (_event, input: Uint8Array, request: SidecarRequest): Promise<Uint8Array> =>

@@ -123,6 +123,11 @@ body {
   opacity: 0.3;
   cursor: default;
 }
+/* Açık/kapalı düğme (ör. dikey kilit): açıkken hafif dolgu. */
+.icon-btn.on {
+  background: color-mix(in srgb, var(--ink) 18%, transparent);
+  border-radius: 6px;
+}
 
 /* ---------- Kök + okuyucu ---------- */
 .reader-root {

@@ -14,6 +14,7 @@ import { CloseIcon } from './components/icons'
 import { deletePages, extractPages, isEncrypted, reorderPages, rotatePages } from './reader/edit'
 import { pageTops } from './reader/layout'
 import { katmandaSecim } from './reader/kopyala'
+import { DIKEY_ORAN, belgeOrani, kilitOku, kilitYaz } from './reader/oran'
 import type { SelReq } from './components/find-highlight'
 import type { DocEntry } from './types'
 
@@ -29,6 +30,9 @@ export default function App(): React.JSX.Element {
   const [pagesOpen, setPagesOpen] = useState(false)
   const [pip, setPip] = useState(false)
   const [fs, setFs] = useState(false) // tam ekran (F11); kaynak ana süreç olayları
+  // Dikey kilit (9:16): açıkken her belge 21:30 pencerede (eski davranış); kapalıyken
+  // (varsayılan) pencere belgenin sayfa oranına uyar → yatay belgede altta boşluk kalmaz.
+  const [dikeyKilit, setDikeyKilit] = useState<boolean>(kilitOku)
   const [barShown, setBarShown] = useState(false)
   const [hovering, setHovering] = useState(false)
   const [dragActive, setDragActive] = useState(false)
@@ -104,6 +108,25 @@ export default function App(): React.JSX.Element {
     clearSel()
     ilkSecim.current = false
   }, [doc, clearSel])
+
+  // Pencere oranı: belge açılınca (ya da kilit değişince) ana sürece bildir. Gizli
+  // açılışta (dosyayla) bu çağrı firstDocReady'den önce gider → pencere doğru oranla
+  // görünür. Belge yokken yalnız kilit açıksa dikeye çekilir. Düzenlemeler (döndür,
+  // sil, sırala) yeni DocEntry üretir; oran fiilen değişmediyse pencereye dokunulmaz.
+  const hedefOran = useMemo(
+    () => (dikeyKilit ? DIKEY_ORAN : doc ? belgeOrani(doc) : null),
+    [doc, dikeyKilit]
+  )
+  const sonOran = useRef<number | null>(null)
+  useEffect(() => {
+    if (hedefOran === null) {
+      sonOran.current = null // belge kapandı: sonraki dosya oranını yeniden gönderir
+      return
+    }
+    if (sonOran.current !== null && Math.abs(hedefOran - sonOran.current) < 0.01) return
+    sonOran.current = hedefOran
+    void window.api.setAspect(hedefOran, true)
+  }, [hedefOran])
 
   // Dosyayla açılışta pencere, belge hazır olana dek GİZLİ tutulur (main süreç);
   // ilk belge boyanınca burada main'e haber verilir → pencere o an gösterilir, böylece
@@ -274,6 +297,14 @@ export default function App(): React.JSX.Element {
     void window.api.fullScreenToggle().then((v) => setFs(!!v))
   }, [])
 
+  const toggleDikeyKilit = useCallback(() => {
+    window.api.olay('dikeykilit')
+    setDikeyKilit((v) => {
+      kilitYaz(!v)
+      return !v
+    })
+  }, [])
+
   // Açık belge bir markdown kaynağından mı geldi? (Ad .pdf'e döner, ama docApi.path
   // ORİJİNAL .md yolunu tutar.) Öyleyse Ctrl+E ile Sublime'da düzenlenebilir.
   const mdSource = useMemo(
@@ -435,6 +466,10 @@ export default function App(): React.JSX.Element {
       { label: 'Uzaklaştır', shortcut: acc('Ctrl+-'), disabled: !hasDoc, onClick: () => view.zoomOut() },
       { label: 'Genişliğe Sığdır', shortcut: acc('Ctrl+0'), disabled: !hasDoc, onClick: () => view.fitWidth() },
       { label: 'Sayfaya Sığdır', disabled: !hasDoc, onClick: () => view.fitPage() },
+      {
+        label: (dikeyKilit ? '✓ ' : '') + 'Dikey Pencere Kilidi (9:16)',
+        onClick: toggleDikeyKilit
+      },
       { label: 'Ara…', shortcut: acc('Ctrl+F'), disabled: !hasDoc, onClick: () => find.openFind() },
       { label: '', separator: true },
       {
@@ -493,6 +528,8 @@ export default function App(): React.JSX.Element {
     togglePip,
     fs,
     toggleFs,
+    dikeyKilit,
+    toggleDikeyKilit,
     mdSource,
     editSource,
     selText,
@@ -575,6 +612,8 @@ export default function App(): React.JSX.Element {
             onFitWidth={() => view.fitWidth()}
             onFind={() => find.openFind()}
             onMenu={openMenuAt}
+            dikeyKilit={dikeyKilit}
+            onDikeyKilit={toggleDikeyKilit}
           />
         )}
 

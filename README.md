@@ -95,6 +95,7 @@ working normally.
 | `Ctrl+F` | Find (enables OCR for scanned pages) |
 | `Ctrl+P` | Toggle PiP mode |
 | `F11` | Toggle full screen |
+| Top bar 9:16 button | Portrait lock: on = every document in a 9:16 window; off (default) = the window follows the page aspect ratio |
 | `Ctrl` + `+` / `-` | Zoom in / out |
 | `Ctrl+0` | Fit width |
 | `Ctrl` + wheel | Zoom around the pointer |

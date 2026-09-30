@@ -97,6 +97,7 @@ Python yoksa bu iki özellik hata bildirir, uygulamanın geri kalanı normal ça
 | `Ctrl+F` | Ara (taranmış sayfalar için OCR'ı da başlatır) |
 | `Ctrl+P` | PiP moduna gir / çık |
 | `F11` | Tam ekrana gir / çık |
+| Üst çubuk 9:16 düğmesi | Dikey kilit: açıkken her belge 9:16 pencerede; kapalıyken (varsayılan) pencere belgenin sayfa oranına uyar |
 | `Ctrl` + `+` / `-` | Yakınlaştır / uzaklaştır |
 | `Ctrl+0` | Genişliğe sığdır |
 | `Ctrl` + tekerlek | İmleç odaklı yakınlaştırma |
