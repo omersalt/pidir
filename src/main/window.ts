@@ -123,6 +123,9 @@ export function togglePip(win?: BrowserWindow | null): boolean {
     s.pipWasMax = false
     s.pipBounds = null
   } else {
+    // Tam ekrandayken PiP'e geçiş: önce tam ekrandan çık, yoksa PiP kutusu tam
+    // ekranın üstüne yazılır ve dönüşte tam ekran boyutu "normal" sanılır.
+    if (w.isFullScreen()) w.setFullScreen(false)
     s.pipWasMax = w.isMaximized()
     s.pipBounds = s.pipWasMax ? w.getNormalBounds() : w.getBounds()
     if (s.pipWasMax) w.unmaximize()
@@ -144,6 +147,23 @@ export function setPipOpacity(value: number, win?: BrowserWindow | null): void {
   if (!w || st(w).pipBounds === null) return
   if (!Number.isFinite(value)) return
   w.setOpacity(Math.min(1, Math.max(0.3, value)))
+}
+
+// --- Tam ekran (F11, pencere-başına) ---
+export function isFullScreen(win?: BrowserWindow | null): boolean {
+  const w = win ?? activeWindow()
+  return !!w && !w.isDestroyed() && w.isFullScreen()
+}
+
+/** Tam ekrana gir / çık. PiP'teyken anlamsız (küçük, hep üstte panel) → dokunmaz,
+ * false döner. Oran kilidi enter/leave olaylarında yönetilir (createWindow). */
+export function toggleFullScreen(win?: BrowserWindow | null): boolean {
+  const w = win ?? activeWindow()
+  if (!w || w.isDestroyed()) return false
+  if (st(w).pipBounds !== null) return false
+  const next = !w.isFullScreen()
+  w.setFullScreen(next)
+  return next
 }
 
 // --- Kendi (çerçevesiz) pencere düğmelerimiz (pencere-başına) ---
@@ -223,6 +243,22 @@ export function createWindow(openPaths: string[] = []): BrowserWindow {
   // Oranı kilitle: belge yüklense de kendiliğinden bozulmaz; kullanıcı elle
   // boyutlandırınca da 21:30 korunur (PiP setBounds programatik olduğundan muaf).
   win.setAspectRatio(ASPECT)
+
+  // Tam ekran (F11 ya da sistem kaynaklı): oran kilidi tam ekranla çelişir →
+  // girerken kaldır, çıkınca geri koy; renderer'a da haber ver (Esc ile çıkış,
+  // sürükleme şeridinin kapatılması, menü etiketi buna bakar).
+  // 🪤 Durum OLAY ADINDAN alınır, isFullScreen() SORULMAZ: Windows'ta bu olaylar
+  // pencere gerçekten değişmeden ÖNCE ve eşzamanlı yayınlanır; sorgu eski değeri
+  // döndürüp her şeyi ters kurar (macOS'ta olay geçişten sonra gelir, ikisi de doğru).
+  const fsUygula =
+    (fs: boolean) =>
+    (): void => {
+      if (win.isDestroyed()) return
+      win.setAspectRatio(fs ? 0 : ASPECT)
+      win.webContents.send('pdfx:fullscreen-changed', fs)
+    }
+  win.on('enter-full-screen', fsUygula(true))
+  win.on('leave-full-screen', fsUygula(false))
 
   let revealTimer: ReturnType<typeof setTimeout> | null = null
   const doReveal = (): void => {

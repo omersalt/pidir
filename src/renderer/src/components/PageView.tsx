@@ -1,7 +1,7 @@
 import { memo, useEffect, useRef, useState } from 'react'
 import type { PDFDocumentProxy, RenderTask } from 'pdfjs-dist'
 import { BASE_RASTER, dpr, logRenderError, renderBase, renderDetail } from './page-view/raster'
-import { FindHighlight } from './find-highlight'
+import { FindHighlight, type SelReq } from './find-highlight'
 import type { OcrWord } from '../ocr/types'
 
 interface PageViewProps {
@@ -14,6 +14,8 @@ interface PageViewProps {
   detail?: boolean
   highlightQuery?: string
   ocrWords?: OcrWord[]
+  selectAt?: SelReq | null
+  onSelectResolved?: (ok: boolean) => void
 }
 
 function PageViewImpl({
@@ -25,7 +27,9 @@ function PageViewImpl({
   eager = false,
   detail = true,
   highlightQuery,
-  ocrWords
+  ocrWords,
+  selectAt,
+  onSelectResolved
 }: PageViewProps): React.JSX.Element {
   const rootRef = useRef<HTMLDivElement>(null)
   const baseRef = useRef<HTMLCanvasElement>(null)
@@ -118,13 +122,17 @@ function PageViewImpl({
     <div className="pageview" ref={rootRef}>
       <canvas ref={baseRef} className={baseReady ? 'pageview-base ready' : 'pageview-base'} />
       <canvas ref={detailRef} className="pageview-detail" style={{ display: 'none' }} />
-      {near && highlightQuery ? (
+      {near && (highlightQuery || selectAt) ? (
         <FindHighlight
           pdf={pdf}
           pageNumber={pageNumber}
           naturalHeight={naturalHeight}
-          query={highlightQuery}
+          // Arama kapalıyken katman SEÇİM için monte olur; paint() boş needle'da
+          // no-op'tur (taze span'ların element çocuğu yoktur), yani güvenli.
+          query={highlightQuery ?? ''}
           ocrWords={ocrWords}
+          selectAt={selectAt}
+          onSelectResolved={onSelectResolved}
         />
       ) : null}
     </div>

@@ -16,7 +16,9 @@ import {
   toggleMaximize,
   closeWindow,
   setCaptionSymbols,
-  revealWindow
+  revealWindow,
+  toggleFullScreen,
+  isFullScreen
 } from './window'
 import { runSidecar, SidecarRequest } from './sidecar'
 import { openInEditor, isMarkdown, isText } from './md'
@@ -24,6 +26,9 @@ import { olayYaz } from './telemetri'
 import { guncellemeDurumu } from './guncelleyici'
 
 const MAX_WRITE_BYTES = 1024 * 1024 * 1024 // 1 GiB cap on a single IPC write
+// clipboard.writeText SENKRON: sınırsız metin ana süreci kilitler (Ctrl+A + Kopyala).
+// renderer/reader/kopyala.ts içindeki MAX_KOPYA ile AYNI değer olmalı.
+const MAX_CLIPBOARD_CHARS = 2 * 1024 * 1024
 
 // Bir IPC'yi çağıran (gönderen) pencere — işlemler doğru pencereyi hedeflesin.
 const senderWin = (e: Electron.IpcMainInvokeEvent): BrowserWindow | null =>
@@ -42,6 +47,8 @@ export function registerIpc(): void {
   ipcMain.handle('pdfx:pip-toggle', (e) => togglePip(senderWin(e)))
   ipcMain.handle('pdfx:pip-state', (e) => isPip(senderWin(e)))
   ipcMain.handle('pdfx:pip-opacity', (e, value: number) => setPipOpacity(Number(value), senderWin(e)))
+  ipcMain.handle('pdfx:fullscreen-toggle', (e) => toggleFullScreen(senderWin(e)))
+  ipcMain.handle('pdfx:fullscreen-state', (e) => isFullScreen(senderWin(e)))
   ipcMain.handle(
     'pdfx:sidecar',
     (_event, input: Uint8Array, request: SidecarRequest): Promise<Uint8Array> =>
@@ -98,6 +105,21 @@ export function registerIpc(): void {
   })
 
   ipcMain.handle('pdfx:clipboard-clear', () => clipboard.clear())
+
+  // Belgeden seçilen metnin panoya yazılması. navigator.clipboard yerine IPC:
+  // çerçevesiz pencerede odak/izin durumundan bağımsız, deterministik çalışır.
+  ipcMain.handle('pdfx:write-clipboard-text', (_e, text: unknown): boolean => {
+    if (typeof text !== 'string' || text.length === 0) return false
+    let out = text
+    if (out.length > MAX_CLIPBOARD_CHARS) {
+      out = out.slice(0, MAX_CLIPBOARD_CHARS)
+      // Vekil çiftinin ortasından kesme: panoda U+FFFD çıkardı.
+      const son = out.charCodeAt(out.length - 1)
+      if (son >= 0xd800 && son <= 0xdbff) out = out.slice(0, -1)
+    }
+    clipboard.writeText(out)
+    return true
+  })
 
   ipcMain.handle(
     'pdfx:expand-drop-paths',

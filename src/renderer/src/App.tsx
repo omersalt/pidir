@@ -13,6 +13,8 @@ import { PageManager } from './components/PageManager'
 import { CloseIcon } from './components/icons'
 import { deletePages, extractPages, isEncrypted, reorderPages, rotatePages } from './reader/edit'
 import { pageTops } from './reader/layout'
+import { katmandaSecim } from './reader/kopyala'
+import type { SelReq } from './components/find-highlight'
 import type { DocEntry } from './types'
 
 const TOAST_MS = 3500
@@ -26,17 +28,62 @@ export default function App(): React.JSX.Element {
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
   const [pagesOpen, setPagesOpen] = useState(false)
   const [pip, setPip] = useState(false)
+  const [fs, setFs] = useState(false) // tam ekran (F11); kaynak ana süreç olayları
   const [barShown, setBarShown] = useState(false)
   const [hovering, setHovering] = useState(false)
   const [dragActive, setDragActive] = useState(false)
   const [pillShown, setPillShown] = useState(false)
   const pillTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastFindScroll = useRef('')
+  // Metin seçim kipi. `sel` yalnız ÇİFT TIK ile dolar; katman kapıdan geçemezse
+  // onSelectResolved(false) ile hemen null'a döner (kip hiç açılmamış olur).
+  const [sel, setSel] = useState<SelReq | null>(null)
+  const [selText, setSelText] = useState('')
+  const ilkSecim = useRef(false)
 
   const flash = useCallback((message: string) => {
     if (toastTimer.current) clearTimeout(toastTimer.current)
     setToast(message)
     toastTimer.current = setTimeout(() => setToast(null), TOAST_MS)
+  }, [])
+
+  const clearSel = useCallback(() => {
+    setSel(null)
+    // ZORUNLU: arama açıkken katman SÖKÜLMEZ, yalnız .selectable düşer. DOM'da kalan
+    // bayat bir Range'i webContents.copy() kopyalamaya devam ederdi.
+    window.getSelection()?.removeAllRanges()
+  }, [])
+
+  const onSelectResolved = useCallback(
+    (ok: boolean) => {
+      if (!ok) {
+        // setSel(null) YETMEZ: arama açıkken katman SÖKÜLMEZ; bayat bir DOM Range
+        // kalırsa webContents.copy() onu kopyalamaya devam eder.
+        clearSel()
+        return
+      }
+      if (!ilkSecim.current) {
+        ilkSecim.current = true
+        flash(isMac ? '⌘C ile kopyala' : 'Ctrl+C ile kopyala')
+      }
+    },
+    [clearSel, flash]
+  )
+
+  // Panoya yazmanın TEK doğru yeri: `copy` olayı. Windows'ta Blink'in yerleşik
+  // editing komutu, macOS'ta menu.ts'teki { role: 'editMenu' } → webContents.copy()
+  // İKİSİ de bu olayı ateşler. keydown'a `case 'c'` eklemek mac'te çakışır ve
+  // panoya iki kez yazardı.
+  useEffect(() => {
+    const onCopy = (e: ClipboardEvent): void => {
+      const text = katmandaSecim()
+      if (!text) return // girdi kutularındaki doğal kopyalamaya DOKUNMA
+      e.clipboardData?.setData('text/plain', text)
+      e.preventDefault()
+      window.api.olay('kopyala')
+    }
+    document.addEventListener('copy', onCopy)
+    return () => document.removeEventListener('copy', onCopy)
   }, [])
 
   // Bekleyen zamanlayıcıları unmount'ta temizle (setState-after-unmount önle).
@@ -50,6 +97,13 @@ export default function App(): React.JSX.Element {
 
   const docApi = useReaderDoc(flash)
   const { doc } = docApi
+
+  // Belge değişince kipi kapat: `sel.page` bayat bir indekse işaret ederse yeni
+  // belgenin BAŞKA bir sayfasında kip kendiliğinden açılırdı.
+  useEffect(() => {
+    clearSel()
+    ilkSecim.current = false
+  }, [doc, clearSel])
 
   // Dosyayla açılışta pencere, belge hazır olana dek GİZLİ tutulur (main süreç);
   // ilk belge boyanınca burada main'e haber verilir → pencere o an gösterilir, böylece
@@ -212,6 +266,14 @@ export default function App(): React.JSX.Element {
     void window.api.pipToggle()
   }, [])
 
+  // Tam ekran (F11). Durum ana süreçten gelir (enter/leave olayları) → sistem
+  // kaynaklı değişimlerde de arayüz doğru kalır.
+  const toggleFs = useCallback(() => {
+    window.api.olay('tamekran')
+    // Dönen değer hedef durumdur; olay bildirimi de gelir, bu ikinci güvence.
+    void window.api.fullScreenToggle().then((v) => setFs(!!v))
+  }, [])
+
   // Açık belge bir markdown kaynağından mı geldi? (Ad .pdf'e döner, ama docApi.path
   // ORİJİNAL .md yolunu tutar.) Öyleyse Ctrl+E ile Sublime'da düzenlenebilir.
   const mdSource = useMemo(
@@ -251,6 +313,10 @@ export default function App(): React.JSX.Element {
   }, [find.active, find.matchedQuery, find.result, doc, scrollToPage])
 
   useEffect(() => window.api.onPipChanged((next) => setPip(next)), [])
+  useEffect(() => {
+    void window.api.fullScreenState().then((v) => setFs(!!v))
+    return window.api.onFullScreenChanged((next) => setFs(next))
+  }, [])
 
   // Native pencere düğmelerinin sembolleri yalnız üstte hover'da görünür (snap
   // layouts için düğmeler hep var ama normalde arka plan renginde/görünmez).
@@ -263,10 +329,20 @@ export default function App(): React.JSX.Element {
   const keyHandler = useRef<(e: KeyboardEvent) => void>(() => {})
   keyHandler.current = (e: KeyboardEvent): void => {
     if (e.key === 'Escape') {
+      if (e.repeat) return // basılı tutulan Esc katmanları art arda kapatmasın
       if (menu) setMenu(null)
       else if (pagesOpen) setPagesOpen(false)
+      else if (sel) clearSel()
       else if (find.open) find.closeFind()
+      else if (fs) toggleFs()
       else if (pip) togglePip()
+      return
+    }
+    if (e.key === 'F11') {
+      e.preventDefault()
+      // Tuş tekrarı tam ekranı açıp kapatmasın; PiP'te ana süreç zaten reddeder,
+      // boş telemetri olayı da yazılmasın.
+      if (!e.repeat && !pip) toggleFs()
       return
     }
     if (!(e.ctrlKey || e.metaKey) || e.altKey) return
@@ -296,6 +372,21 @@ export default function App(): React.JSX.Element {
         e.preventDefault()
         find.openFind()
         break
+      case 'a':
+      case 'A': {
+        if (isMac) break // native Select All rolü preventDefault'u dinlemez
+        const ae = document.activeElement
+        if (ae instanceof HTMLInputElement || ae instanceof HTMLTextAreaElement) break
+        const layer = document.querySelector('.find-layer.selectable')
+        if (!layer) break
+        e.preventDefault()
+        const r = document.createRange()
+        r.selectNodeContents(layer)
+        const sn = window.getSelection()
+        sn?.removeAllRanges()
+        sn?.addRange(r)
+        break
+      }
       case 'e':
       case 'E':
         // Yalnız markdown belgelerinde: kaynağı Sublime/Notepad'de aç (PİDİR yazmaz).
@@ -346,7 +437,24 @@ export default function App(): React.JSX.Element {
       { label: 'Sayfaya Sığdır', disabled: !hasDoc, onClick: () => view.fitPage() },
       { label: 'Ara…', shortcut: acc('Ctrl+F'), disabled: !hasDoc, onClick: () => find.openFind() },
       { label: '', separator: true },
-      { label: 'Sayfalar…', disabled: !hasDoc, onClick: () => setPagesOpen(true) },
+      {
+        label: 'Kopyala',
+        shortcut: acc('Ctrl+C'),
+        disabled: !selText,
+        onClick: () => {
+          void window.api.writeClipboardText(selText)
+          window.api.olay('kopyala')
+        }
+      },
+      { label: '', separator: true },
+      {
+        label: 'Sayfalar…',
+        disabled: !hasDoc,
+        onClick: () => {
+          clearSel() // PageManager Reader'ı tamamen örter; görünmez kip Escape'i yutmasın
+          setPagesOpen(true)
+        }
+      },
       { label: 'Bu Sayfayı Döndür', disabled: !hasDoc, onClick: () => void rotateCurrent() },
       { label: 'Sadeleştir (üst/alt bilgi)', disabled: !hasDoc, onClick: () => void simplify() },
       ...(mdSource
@@ -365,22 +473,52 @@ export default function App(): React.JSX.Element {
         shortcut: acc('Ctrl+P'),
         disabled: !hasDoc,
         onClick: togglePip
+      },
+      {
+        label: fs ? 'Tam Ekrandan Çık' : 'Tam Ekran',
+        shortcut: 'F11',
+        disabled: pip, // PiP paneli tam ekrana geçmez; önce PiP'ten çık
+        onClick: toggleFs
       }
     ]
-  }, [doc, docApi, saveAs, view, find, rotateCurrent, simplify, pip, togglePip, mdSource, editSource])
+  }, [
+    doc,
+    docApi,
+    saveAs,
+    view,
+    find,
+    rotateCurrent,
+    simplify,
+    pip,
+    togglePip,
+    fs,
+    toggleFs,
+    mdSource,
+    editSource,
+    selText,
+    clearSel
+  ])
 
   return (
     <FindProvider value={findState}>
       <div
-        className={'reader-root' + (dragActive ? ' drag' : '') + (pip ? ' pip' : '')}
+        className={
+          'reader-root' + (dragActive ? ' drag' : '') + (pip ? ' pip' : '') + (fs ? ' fs' : '')
+        }
         onMouseMove={onMouseMove}
         onMouseEnter={() => setHovering(true)}
         onMouseLeave={() => setHovering(false)}
         onContextMenu={(e) => {
           e.preventDefault()
+          // Menü öğeleri ayrı bir DOM dalındaki <button>'lar; onClick anında seçimi
+          // okumak güvenilmez. Anlık görüntüyü menüyle AYNI ANDA al.
+          setSelText(katmandaSecim())
           setMenu({ x: e.clientX, y: e.clientY })
         }}
         onDragOver={(e) => {
+          // user-select:text metin sürüklemeyi mümkün kıldı; onDragLeave yalnız
+          // relatedTarget === null iken temizlediği için gösterge asılı kalırdı.
+          if (!e.dataTransfer.types.includes('Files')) return
           e.preventDefault()
           if (!dragActive) setDragActive(true)
         }}
@@ -395,7 +533,15 @@ export default function App(): React.JSX.Element {
         }}
       >
         {doc ? (
-          <Reader doc={doc} view={view} scrollerRef={scrollerRef} />
+          <Reader
+            doc={doc}
+            view={view}
+            scrollerRef={scrollerRef}
+            sel={sel}
+            onSel={setSel}
+            onClearSel={clearSel}
+            onSelectResolved={onSelectResolved}
+          />
         ) : (
           <EmptyState
             onOpen={() => void docApi.openViaDialog()}

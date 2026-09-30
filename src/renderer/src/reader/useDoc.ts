@@ -81,7 +81,8 @@ export function useReaderDoc(flash: (message: string) => void): ReaderDocApi {
           void next.pages[0]?.source.pdf.destroy() // eskimiş yükleme: öksüz pdf'i serbest bırak
           return
         }
-        apply(next, file.data, file.name, file.path ?? '')
+        // yeniDosya: okuyucu başa sarar (replaceBytes'taki düzenleme tazelemesi konumu korur).
+        apply({ ...next, yeniDosya: true }, file.data, file.name, file.path ?? '')
       } catch (e) {
         if (token !== reqSeq.current) return
         const msg = e instanceof Error ? e.message : String(e)

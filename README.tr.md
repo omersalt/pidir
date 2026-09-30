@@ -96,10 +96,12 @@ Python yoksa bu iki özellik hata bildirir, uygulamanın geri kalanı normal ça
 | `Ctrl+S` | Farklı kaydet |
 | `Ctrl+F` | Ara (taranmış sayfalar için OCR'ı da başlatır) |
 | `Ctrl+P` | PiP moduna gir / çık |
+| `F11` | Tam ekrana gir / çık |
 | `Ctrl` + `+` / `-` | Yakınlaştır / uzaklaştır |
 | `Ctrl+0` | Genişliğe sığdır |
 | `Ctrl` + tekerlek | İmleç odaklı yakınlaştırma |
-| `Esc` | Menüyü, sayfa yöneticisini, arama çubuğunu ya da PiP'i kapatır |
+| Sol tuşla sürükle | Yakınlaştırılmış sayfayı elle kaydır (imleç el olur) |
+| `Esc` | Menüyü, sayfa yöneticisini, arama çubuğunu, tam ekranı ya da PiP'i kapatır |
 | `Ctrl+Shift+I` | Geliştirici araçları |
 
 macOS derlemelerinde `Ctrl` yerine `⌘` geçer. Sayfa yöneticisi, sayfaya sığdırma, döndürme

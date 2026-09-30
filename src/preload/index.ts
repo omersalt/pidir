@@ -34,6 +34,8 @@ const api = {
     ipcRenderer.invoke('pdfx:read-clipboard-image'),
   readClipboardFiles: (): Promise<OpenedFile[]> => ipcRenderer.invoke('pdfx:read-clipboard-files'),
   clearClipboard: (): Promise<void> => ipcRenderer.invoke('pdfx:clipboard-clear'),
+  writeClipboardText: (text: string): Promise<boolean> =>
+    ipcRenderer.invoke('pdfx:write-clipboard-text', text),
   getPathForFile: (file: File): string => webUtils.getPathForFile(file),
   expandDropPaths: (paths: string[]): Promise<OpenedFile[]> =>
     ipcRenderer.invoke('pdfx:expand-drop-paths', paths),
@@ -59,6 +61,14 @@ const api = {
   pipToggle: (): Promise<boolean> => ipcRenderer.invoke('pdfx:pip-toggle'),
   pipState: (): Promise<boolean> => ipcRenderer.invoke('pdfx:pip-state'),
   pipOpacity: (value: number): Promise<void> => ipcRenderer.invoke('pdfx:pip-opacity', value),
+  /** Tam ekrana gir / çık (F11). Dönüş: yeni durum. */
+  fullScreenToggle: (): Promise<boolean> => ipcRenderer.invoke('pdfx:fullscreen-toggle'),
+  fullScreenState: (): Promise<boolean> => ipcRenderer.invoke('pdfx:fullscreen-state'),
+  onFullScreenChanged: (callback: (fs: boolean) => void): (() => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, fs: boolean): void => callback(fs)
+    ipcRenderer.on('pdfx:fullscreen-changed', listener)
+    return () => ipcRenderer.removeListener('pdfx:fullscreen-changed', listener)
+  },
   sidecar: (input: Uint8Array, request: SidecarRequest): Promise<Uint8Array> =>
     ipcRenderer.invoke('pdfx:sidecar', input, request),
   /** Kullanılan özelliği bildirir (telemetri). Ateşle-unut: arayüz sonucu beklemez. */

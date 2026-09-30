@@ -11,6 +11,7 @@
   --accent-ink: #1a1a1c;
   --accent-hover: #ffffff;
   --select: #74a9ff;
+  --select-bg: rgba(116, 169, 255, 0.55); /* seçim zemini — --select ile aynı ton */
   --danger: #ff6b6b;
   --hover: rgba(255, 255, 255, 0.08);
   --control: rgba(255, 255, 255, 0.12);
@@ -32,6 +33,7 @@
     --accent-ink: #ffffff;
     --accent-hover: #2e2e34;
     --select: #3b82f6;
+    --select-bg: rgba(59, 130, 246, 0.5);
     --danger: #d64545;
     --hover: rgba(22, 22, 26, 0.06);
     --control: rgba(255, 255, 255, 0.92);
@@ -153,6 +155,22 @@ body {
   overflow: auto;
   outline: none;
 }
+/* Yakınlaştırınca (yatay taşma) el imleci; sürüklerken kapalı el. Sınıflar
+   reader/kaydir.ts tarafından yönetilir. Sürükleme sırasında alt katmanların
+   (metin katmanı vb.) kendi imleçleri geçici olarak bastırılır. */
+.reader-scroll.tutulabilir {
+  cursor: grab;
+}
+.reader-scroll.tutuluyor,
+.reader-scroll.tutuluyor * {
+  cursor: grabbing !important;
+}
+/* Tam ekranda (F11) üst sürükleme şeridi devre dışı: çerçevesiz pencere tam
+   ekrandayken caption sürüklemesi pencereyi yerinden oynatmasın. */
+.reader-root.fs .win-drag {
+  -webkit-app-region: no-drag;
+  pointer-events: none;
+}
 
 .reader-column {
   min-width: 100%;
@@ -206,11 +224,15 @@ body {
   transform-origin: 0 0;
   pointer-events: none;
   mix-blend-mode: multiply;
+  /* Yüksek Karşıtlık kipi `color: transparent`'ı sistem rengine çevirip canvas'taki
+     gerçek harflerin üstünde HAYALET METİN üretir — zorlanan renkleri kapat. */
+  forced-color-adjust: none;
+  -webkit-text-size-adjust: none;
   --min-font-size: 1;
   --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
   --min-font-size-inv: calc(1 / var(--min-font-size));
 }
-.find-layer > span {
+.find-layer > :is(span, br) {
   position: absolute;
   color: transparent;
   white-space: pre;
@@ -224,6 +246,39 @@ body {
 .find-hit {
   border-radius: 1px;
   background-color: #ffd54a;
+}
+
+/* ---------- Metin seçimi (çift tıkla açılan kip) ---------- */
+/* Katman yalnız seçim istendiğinde `.selectable` ile doğar. Kip kapalıyken katman
+   ya DOM'da değildir ya da (arama açıksa) pointer-events:none ile şeffaftır.
+   pointer-events:auto ŞART: elementsFromPoint/caretPositionFromPoint
+   pointer-events:none olan öğeleri ATLAR — kapıyı sormak imkânsız hale gelirdi. */
+.find-layer.selectable {
+  pointer-events: auto;
+  user-select: text;
+  -webkit-user-select: text;
+  /* multiply bir ÇARPIMdır: siyah zeminli bir slaytta multiply(mavi, siyah) = siyah,
+     yani seçim rengi görünmez olurdu. Seçim kipinde vurgunun okunurluğu, arama
+     sarısının alttaki harfleri yutmamasından önce gelir. */
+  mix-blend-mode: normal;
+}
+.find-layer.selectable > span {
+  cursor: text;
+}
+/* multiply kapalıyken .find-hit'in OPAK sarısı (#ffd54a) canvas'taki harfleri yutar.
+   Vurguyu saydamlaştır: harfler %55 geçirgenlikle okunur kalır, sarı yine görünür. */
+.find-layer.selectable .find-hit {
+  background-color: rgba(255, 213, 74, 0.45);
+}
+/* `color` AÇIKÇA yazılmalı: Chromium'un UA ::selection kuralı `color: HighlightText`
+   içerir; yalnız background verilirse saydam span'lar seçilince GÖRÜNÜR olur ve
+   canvas'taki gerçek harflerin üstüne kaymış ikinci bir metin biner. */
+.find-layer ::selection {
+  background: var(--select-bg);
+  color: transparent;
+}
+.find-layer br::selection {
+  background: transparent;
 }
 .ocr-highlight-layer {
   position: absolute;
@@ -652,6 +707,7 @@ body {
   border-radius: 999px;
   box-shadow: 0 8px 28px rgba(20, 20, 24, 0.3);
   animation: toast-in 0.2s ease;
+  pointer-events: none; /* bildirim altındaki metne tıklamayı engellemesin */
 }
 @keyframes toast-in {
   from {

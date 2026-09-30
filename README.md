@@ -94,10 +94,12 @@ working normally.
 | `Ctrl+S` | Save as |
 | `Ctrl+F` | Find (enables OCR for scanned pages) |
 | `Ctrl+P` | Toggle PiP mode |
+| `F11` | Toggle full screen |
 | `Ctrl` + `+` / `-` | Zoom in / out |
 | `Ctrl+0` | Fit width |
 | `Ctrl` + wheel | Zoom around the pointer |
-| `Esc` | Close the menu, page manager, find bar, or PiP |
+| Left-drag | Pan a zoomed-in page (hand cursor) |
+| `Esc` | Close the menu, page manager, find bar, full screen, or PiP |
 | `Ctrl+Shift+I` | Developer tools |
 
 On macOS builds, `⌘` replaces `Ctrl`. Page manager, fit-to-page, rotate and Simplify are in

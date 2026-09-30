@@ -102,11 +102,12 @@ export function useReaderView(
     bumpRender()
   }, [computeFitWidth, computeFitPage, bumpRender])
 
-  // Yeni belge → genişliğe sığdır, başa sar.
+  // Yeni belge → genişliğe sığdır. Sayfa sayacı BURADA sıfırlanmaz: Reader'ın belge
+  // etkisi gerçek kaydırma konumundan hesaplar (yeni dosyada başa sarar → 1; düzenleme
+  // tazelemesinde konum korunur → aynı sayfa). Buradaki bir reset o değeri ezerdi.
   useEffect(() => {
     if (!doc) return
     setFit('width')
-    setCurrentPage(1)
     setScale(computeFitWidth())
     setRenderVersion((v) => v + 1)
     // computeFitWidth doc'a bağlı; sadece doc değişince yeniden sığdır istiyoruz.

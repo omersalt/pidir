@@ -18,4 +18,7 @@ export interface DocEntry {
   id: string
   name: string
   pages: PageEntry[]
+  /** openFile ile açılan YENİ dosya: okuyucu başa sarar. Düzenleme tazelemesinde
+   *  (replaceBytes) bu bayrak yoktur ve okunan yer korunur. */
+  yeniDosya?: boolean
 }
