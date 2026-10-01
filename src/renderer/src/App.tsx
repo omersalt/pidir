@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useReaderDoc } from './reader/useDoc'
-import { useReaderView } from './reader/useView'
+import { useReaderView, type FitMode } from './reader/useView'
 import { useSearchIndex } from './search/useSearchIndex'
 import { useFind } from './app/useFind'
 import { FindProvider } from './search/FindContext'
@@ -349,6 +349,55 @@ export default function App(): React.JSX.Element {
     return window.api.onFullScreenChanged((next) => setFs(next))
   }, [])
 
+  // Tam ekrana girince belge ekranı DOLDURSUN: GENİŞLİĞE sığdır. 16:9 belgede tam
+  // sayfayla aynı; dikey belgede genişlik ekranı doldurur, taşan kısım el imleciyle
+  // kaydırılır. (Sayfaya sığdırma dikey A4'te ekranın %60'ını boş bırakırdı.)
+  // Yakınlaştırılmış (custom) görünüm olduğu gibi kalmasın. Çıkışta önceki görünüm
+  // geri gelir. Windows'ta olay pencere büyümeden gelir: burada kip konur, gerçek boyut
+  // gelince useView'ın ResizeObserver'ı (recomputeFit) ölçeği tazeler; çift rAF'lık
+  // ek tur, boyut değişimi olayla aynı karelere düşerse de yakalar. custom'a dönüşte
+  // ölçek MUTLAK yazılır: çarpan, bekleyen bir setScale'in üstüne binip yanlış çıkar.
+  const fsOnceki = useRef<{ fit: FitMode; scale: number } | null>(null)
+  const fsIlk = useRef(true)
+  useEffect(() => {
+    if (fsIlk.current) {
+      fsIlk.current = false // açılış değeri, geçiş değil
+      return
+    }
+    if (!doc) {
+      fsOnceki.current = null
+      return
+    }
+    if (fs) {
+      fsOnceki.current = { fit: view.fit, scale: view.scale }
+      view.fitWidth()
+    } else if (fsOnceki.current) {
+      const o = fsOnceki.current
+      fsOnceki.current = null
+      if (o.fit === 'width') view.fitWidth()
+      else if (o.fit === 'page') view.fitPage()
+      else view.setScaleAbs(o.scale)
+    }
+    let r2 = 0
+    const r1 = requestAnimationFrame(() => {
+      r2 = requestAnimationFrame(() => view.recomputeFit())
+    })
+    return () => {
+      cancelAnimationFrame(r1)
+      cancelAnimationFrame(r2)
+    }
+    // view her render'da yeni nesne; yalnız fs geçişinde koşmalı.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fs])
+
+  // Tam ekrandayken YENİ dosya açılırsa (Ctrl+O, sürükle-bırak, "birlikte aç") önceki
+  // belgenin görünümü çıkışta ona geri yazılmasın; useView yeni dosyayı zaten genişliğe
+  // sığdırır. Düzenleme tazelemesi (döndür/sil/sırala) aynı dosyadır, yeniDosya taşımaz:
+  // orada geri yükleme doğru davranıştır.
+  useEffect(() => {
+    if (doc?.yeniDosya) fsOnceki.current = null
+  }, [doc])
+
   // Native pencere düğmelerinin sembolleri yalnız üstte hover'da görünür (snap
   // layouts için düğmeler hep var ama normalde arka plan renginde/görünmez).
   useEffect(() => {
@@ -578,6 +627,7 @@ export default function App(): React.JSX.Element {
             onSel={setSel}
             onClearSel={clearSel}
             onSelectResolved={onSelectResolved}
+            tamEkran={fs}
           />
         ) : (
           <EmptyState

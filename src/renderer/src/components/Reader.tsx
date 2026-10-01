@@ -15,6 +15,8 @@ interface ReaderProps {
   onSel: (r: SelReq) => void
   onClearSel: () => void
   onSelectResolved: (ok: boolean) => void
+  /** Tam ekran: el imleci taşma beklemeden hemen çıkar, sürükleme dikeyde de çalışır. */
+  tamEkran: boolean
 }
 
 const clampScale = (n: number): number => Math.max(0.1, Math.min(8, n))
@@ -31,7 +33,8 @@ export function Reader({
   sel,
   onSel,
   onClearSel,
-  onSelectResolved
+  onSelectResolved,
+  tamEkran
 }: ReaderProps): React.JSX.Element {
   const { active, query, matchingPageIds, getOcrWords } = useFindState()
   const pendingFocal = useRef<{ dx: number; dy: number } | null>(null)
@@ -126,7 +129,7 @@ export function Reader({
 
   // Yakınlaştırılmış belgede el imleci + sol tuşla sürükleyerek kaydırma.
   // Seçim kipi açıkken kapalı: metin katmanının jestleriyle çakışmasın.
-  useSurukleKaydir(scrollerRef, { devreDisi: sel !== null })
+  useSurukleKaydir(scrollerRef, { devreDisi: sel !== null, herZaman: tamEkran })
 
   return (
     <div

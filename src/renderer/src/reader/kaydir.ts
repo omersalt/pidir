@@ -9,6 +9,8 @@ const tasiyor = (el: HTMLElement): boolean => el.scrollWidth > el.clientWidth + 
 interface Secenek {
   /** Seçim kipi açıkken sürükleme devre dışı: metin katmanındaki jestler bozulmasın. */
   devreDisi: boolean
+  /** Taşma aranmadan hep açık (tam ekran): el imleci hemen çıkar, sürükleme dikeyde de çalışır. */
+  herZaman: boolean
 }
 
 interface Tutus {
@@ -34,7 +36,7 @@ interface Tutus {
  */
 export function useSurukleKaydir(
   scrollerRef: React.RefObject<HTMLDivElement | null>,
-  { devreDisi }: Secenek
+  { devreDisi, herZaman }: Secenek
 ): void {
   // İmleç sınıfı: içerik (ölçek) ya da kutu boyutu değişince tazele. Seçim kipinde
   // sürükleme kapalı olduğundan el imleci de gösterilmez.
@@ -42,7 +44,7 @@ export function useSurukleKaydir(
     const el = scrollerRef.current
     if (!el) return
     const tazele = (): void => {
-      el.classList.toggle('tutulabilir', !devreDisi && tasiyor(el))
+      el.classList.toggle('tutulabilir', !devreDisi && (herZaman || tasiyor(el)))
     }
     tazele()
     const ro = new ResizeObserver(tazele)
@@ -54,7 +56,7 @@ export function useSurukleKaydir(
       ro.disconnect()
       el.classList.remove('tutulabilir')
     }
-  }, [scrollerRef, devreDisi])
+  }, [scrollerRef, devreDisi, herZaman])
 
   useEffect(() => {
     const el = scrollerRef.current
@@ -72,7 +74,7 @@ export function useSurukleKaydir(
     const bas = (e: PointerEvent): void => {
       // Yalnız sol tuş; dokunmatikte yerel kaydırma zaten var.
       if (e.button !== 0 || e.pointerType === 'touch') return
-      if (!tasiyor(el)) return
+      if (!herZaman && !tasiyor(el)) return
       // Seçilebilir metin katmanı kendi jestlerini yönetir.
       if ((e.target as Element | null)?.closest('.find-layer')) return
       tutus = { id: e.pointerId, x: e.clientX, y: e.clientY, sonX: e.clientX, sonY: e.clientY }
@@ -122,5 +124,5 @@ export function useSurukleKaydir(
       window.removeEventListener('blur', birak)
       birak()
     }
-  }, [scrollerRef, devreDisi])
+  }, [scrollerRef, devreDisi, herZaman])
 }

@@ -23,6 +23,9 @@ export interface ReaderViewApi {
   applyZoom: (factor: number) => void
   fitWidth: () => void
   fitPage: () => void
+  /** Ölçeği MUTLAK değere ayarla (custom kipi). Bekleyen bir setScale varken
+   *  çarpan hesabı yanlış çıkar; tam ekrandan dönüşte kaydedilen ölçek buradan yazılır. */
+  setScaleAbs: (n: number) => void
   bumpRender: () => void
   recomputeFit: () => void
 }
@@ -49,6 +52,11 @@ export function useReaderView(
   const [renderVersion, setRenderVersion] = useState(0)
   const [currentPage, setCurrentPage] = useState(1)
   const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // 🪤 fitRef yalnız render'da güncellenseydi, setFit ile yeniden render arasına düşen
+  // bir ResizeObserver çağrısı (tam ekrana giriş/çıkışta pencere tam o anda büyür)
+  // recomputeFit'i ESKİ kiple koştururdu: custom'dan gelen belge küçük kalır,
+  // width'ten gelen 'page' etiketiyle genişliğe sığardı. Bu yüzden her ayarlayıcı
+  // ref'i senkron yazar; render'daki atama yalnız güvence.
   const fitRef = useRef<FitMode>('width')
   fitRef.current = fit
 
@@ -73,12 +81,14 @@ export function useReaderView(
   }, [doc, scrollerRef])
 
   const fitWidth = useCallback(() => {
+    fitRef.current = 'width'
     setFit('width')
     setScale(computeFitWidth())
     bumpRender()
   }, [computeFitWidth, bumpRender])
 
   const fitPage = useCallback(() => {
+    fitRef.current = 'page'
     setFit('page')
     setScale(computeFitPage())
     bumpRender()
@@ -86,8 +96,19 @@ export function useReaderView(
 
   const applyZoom = useCallback(
     (factor: number) => {
+      fitRef.current = 'custom'
       setFit('custom')
       setScale((s) => clamp(s * factor))
+      bumpRender()
+    },
+    [bumpRender]
+  )
+
+  const setScaleAbs = useCallback(
+    (n: number) => {
+      fitRef.current = 'custom'
+      setFit('custom')
+      setScale(clamp(n))
       bumpRender()
     },
     [bumpRender]
@@ -107,6 +128,7 @@ export function useReaderView(
   // tazelemesinde konum korunur → aynı sayfa). Buradaki bir reset o değeri ezerdi.
   useEffect(() => {
     if (!doc) return
+    fitRef.current = 'width'
     setFit('width')
     setScale(computeFitWidth())
     setRenderVersion((v) => v + 1)
@@ -139,6 +161,7 @@ export function useReaderView(
     applyZoom,
     fitWidth,
     fitPage,
+    setScaleAbs,
     bumpRender,
     recomputeFit
   }
